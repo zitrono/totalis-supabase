@@ -1,0 +1,13 @@
+{
+  "tasks": {
+    "test": "deno test --allow-all --unstable",
+    "test:coverage": "deno test --allow-all --unstable --coverage=coverage",
+    "fmt": "deno fmt",
+    "lint": "deno lint"
+  },
+  "imports": {
+    "https://deno.land/std@0.177.0/": "https://deno.land/std@0.177.0/",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.39.7",
+    "testing/": "https://deno.land/std@0.177.0/testing/"
+  }
+}

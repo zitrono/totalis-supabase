@@ -1,0 +1,24 @@
+{
+  "name": "totalis-production-migration",
+  "version": "1.0.0",
+  "description": "Production data migration toolkit for Totalis Supabase migration",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "ts-node src/index.ts",
+    "export": "ts-node src/export.ts",
+    "migrate": "ts-node src/migrate.ts",
+    "validate": "ts-node src/validate.ts"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0",
+    "pg": "^8.11.3",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.5",
+    "@types/pg": "^8.10.9",
+    "typescript": "^5.3.3",
+    "ts-node": "^10.9.2"
+  }
+}
