@@ -7,7 +7,7 @@ export const config = {
   supabase: {
     url: process.env.SUPABASE_URL!,
     anonKey: process.env.SUPABASE_ANON_KEY!,
-    serviceKey: process.env.SUPABASE_SERVICE_KEY!,
+    serviceKey: process.env.SUPABASE_SERVICE_ROLE_KEY!,
   },
   openai: {
     apiKey: process.env.OPENAI_API_KEY!,
@@ -41,7 +41,7 @@ export const config = {
 const requiredEnvVars = [
   'SUPABASE_URL',
   'SUPABASE_ANON_KEY',
-  'SUPABASE_SERVICE_KEY',
+  'SUPABASE_SERVICE_ROLE_KEY',
   'OPENAI_API_KEY',
 ];
 
