@@ -23,6 +23,7 @@ export function createSupabaseClient(authHeader?: string) {
 }
 
 export async function getUserContext(
+  // deno-lint-ignore no-explicit-any
   supabase: any,
   userId: string,
 ): Promise<UserContext> {

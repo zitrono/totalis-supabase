@@ -16,12 +16,25 @@ export class TestUserService {
     
     if (existingProfile) {
       // Update existing profile with user data
-      return this.updateProfile({
+      const updatedProfile = await this.updateProfile({
         name: data.name,
         year_of_birth: data.dateOfBirth.getFullYear(),
         sex: data.sex,
         coach_id: data.coachId || existingProfile.coach_id
       });
+
+      // Create initial greeting if no messages exist
+      const { data: messages } = await this.supabase
+        .from('messages')
+        .select('id')
+        .eq('user_id', user.id)
+        .limit(1);
+      
+      if (!messages || messages.length === 0) {
+        await this.createInitialGreeting(user.id, updatedProfile.coach_id);
+      }
+
+      return updatedProfile;
     }
 
     // Create user profile if it doesn't exist
@@ -40,6 +53,9 @@ export class TestUserService {
     if (error) {
       throw new Error(`Failed to create user profile: ${error.message}`);
     }
+
+    // Create initial greeting message
+    await this.createInitialGreeting(user.id, profile.coach_id);
 
     return this.mapProfile(profile);
   }
@@ -111,6 +127,43 @@ export class TestUserService {
 
     if (error) {
       throw new Error(`Failed to delete user profile: ${error.message}`);
+    }
+  }
+
+  private async createInitialGreeting(userId: string, coachId: string): Promise<void> {
+    try {
+      // Get coach name
+      const { data: coach } = await this.supabase
+        .from('coaches')
+        .select('name')
+        .eq('id', coachId)
+        .single();
+
+      const coachName = coach?.name || 'your coach';
+      
+      // Create greeting message
+      const greetingMessage = `Hello! I'm ${coachName}, your personal wellness coach. I'm here to support you on your health journey. Would you like to start with a quick health check-in to understand where you are today?`;
+
+      await this.supabase
+        .from('messages')
+        .insert({
+          user_id: userId,
+          coach_id: coachId,
+          role: 'assistant',
+          content: greetingMessage,
+          content_type: 'text',
+          answer_options: {
+            type: 'radio',
+            options: [
+              "Yes, let's do a check-in",
+              "Tell me more about check-ins",
+              "Maybe later"
+            ]
+          }
+        });
+    } catch (error) {
+      console.error('Failed to create initial greeting:', error);
+      // Don't throw - this is not critical for profile creation
     }
   }
 

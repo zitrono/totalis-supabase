@@ -7,6 +7,7 @@ import { runNewUserScenario } from './scenarios/new-user.scenario';
 import { runCategoryCheckInScenario } from './scenarios/category-checkin.scenario';
 import { runChatInteractionScenario } from './scenarios/chat-interaction.scenario';
 import { runAbortCheckInScenario } from './scenarios/abort-checkin.scenario';
+import { runAudioUploadScenario } from './scenarios/audio-upload.scenario';
 
 const program = new Command();
 const client = new TotalisTestClient();
@@ -82,6 +83,19 @@ program
   });
 
 program
+  .command('audio')
+  .description('Run audio upload scenario')
+  .action(async () => {
+    try {
+      await runAudioUploadScenario(client);
+      process.exit(0);
+    } catch (error) {
+      console.error('Error:', error);
+      process.exit(1);
+    }
+  });
+
+program
   .command('interactive')
   .description('Run interactive test session')
   .action(async () => {
@@ -104,6 +118,8 @@ program
     console.log('  checkin - Start a check-in');
     console.log('  cards - Get active cards');
     console.log('  categories - List all categories');
+    console.log('  audio - Upload and transcribe audio');
+    console.log('  transcriptions - List transcription history');
     console.log('  exit - Exit interactive mode\n');
 
     rl.prompt();

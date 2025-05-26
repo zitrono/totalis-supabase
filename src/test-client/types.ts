@@ -135,6 +135,19 @@ export interface CreateUserProfileRequest {
   coachId?: string;
 }
 
+export interface VoiceTranscription {
+  id?: string;
+  user_id: string;
+  file_path: string;
+  file_size: number;
+  duration_seconds: number;
+  transcription: string;
+  context_type?: string;
+  context_id?: string;
+  file_url?: string;
+  created_at: string;
+}
+
 export interface SendMessageRequest {
   content: string;
   role?: 'user';

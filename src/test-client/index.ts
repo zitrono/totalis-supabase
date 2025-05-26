@@ -8,6 +8,7 @@ import { TestChatService } from './services/chat.service';
 import { TestCheckInService } from './services/checkin.service';
 import { TestCardService } from './services/card.service';
 import { TestCategoryService } from './services/category.service';
+import { TestAudioService } from './services/audio.service';
 import { supabase } from '../config/supabase';
 
 export class TotalisTestClient {
@@ -17,6 +18,7 @@ export class TotalisTestClient {
   private checkInService: TestCheckInService;
   private cardService: TestCardService;
   private categoryService: TestCategoryService;
+  private audioService: TestAudioService;
 
   constructor(private supabaseClient: SupabaseClient = supabase) {
     this.authService = new TestAuthService(supabaseClient);
@@ -25,6 +27,7 @@ export class TotalisTestClient {
     this.checkInService = new TestCheckInService(supabaseClient);
     this.cardService = new TestCardService(supabaseClient);
     this.categoryService = new TestCategoryService(supabaseClient);
+    this.audioService = new TestAudioService(supabaseClient);
   }
 
   // Authentication methods
@@ -126,6 +129,27 @@ export class TotalisTestClient {
     return this.categoryService.getCategoryProgress(categoryId);
   }
 
+  // Audio methods
+  async uploadAndTranscribeAudio(audioFile: File | Blob, options?: { prompt?: string; language?: string }) {
+    return this.audioService.uploadAndTranscribe(audioFile, options);
+  }
+
+  async getAudioUsageStats(month?: Date) {
+    return this.audioService.getUsageStats(month);
+  }
+
+  async getAudioUsageLogs(limit?: number) {
+    return this.audioService.getUsageLogs(limit);
+  }
+
+  async testAudioRateLimit(numRequests?: number) {
+    return this.audioService.testRateLimit(numRequests);
+  }
+
+  async createMockAudioFile(durationSeconds?: number, format?: 'mp3' | 'wav' | 'm4a' | 'ogg' | 'webm') {
+    return this.audioService.createMockAudioFile(durationSeconds, format);
+  }
+
   // Getter methods for services
   getCategoryService() {
     return this.categoryService;
@@ -137,6 +161,10 @@ export class TotalisTestClient {
 
   getCardService() {
     return this.cardService;
+  }
+
+  getAudioService() {
+    return this.audioService;
   }
 
   // Test scenario helpers

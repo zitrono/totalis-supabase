@@ -66,11 +66,40 @@ export interface CategoryStat {
 
 export interface LangflowRequest {
   prompt: string;
+  // deno-lint-ignore no-explicit-any
   context: Record<string, any>;
   type: "recommendation" | "checkin" | "chat" | "analytics";
 }
 
 export interface LangflowResponse {
+  // deno-lint-ignore no-explicit-any
   result: any;
+  // deno-lint-ignore no-explicit-any
   metadata?: Record<string, any>;
+}
+
+export interface CheckInQuestion {
+  question: string;
+  questionNumber: number;
+  totalQuestions: number;
+  isComplete: boolean;
+  responseType: 'scale' | 'text' | 'choice';
+}
+
+export interface AIResponse {
+  text: string;
+  suggestions: string[];
+  confidence: number;
+  processingTimeMs: number;
+  coachPersonality: string;
+  followUp: boolean;
+}
+
+export interface CheckInSummary {
+  wellnessLevel: number;
+  insights: string[];
+  summary: string;
+  recommendations: string[];
+  improvementTips: string[];
+  nextCheckInSuggestion: string;
 }

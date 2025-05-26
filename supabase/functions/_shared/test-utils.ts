@@ -7,6 +7,7 @@ export { assertEquals, assertExists };
 
 // Mock Supabase client for testing
 export function createMockSupabaseClient() {
+  // deno-lint-ignore no-explicit-any
   const mockData: Record<string, any[]> = {
     coaches: [
       {
@@ -35,7 +36,8 @@ export function createMockSupabaseClient() {
         }),
     },
     from: (table: string) => ({
-      select: (columns?: string) => ({
+      select: (_columns?: string) => ({
+        // deno-lint-ignore no-explicit-any
         eq: (column: string, value: any) => ({
           single: () =>
             Promise.resolve({
@@ -43,7 +45,8 @@ export function createMockSupabaseClient() {
                 null,
               error: null,
             }),
-          order: (column: string, options?: any) => ({
+          // deno-lint-ignore no-explicit-any
+          order: (_column: string, _options?: any) => ({
             limit: (count: number) =>
               Promise.resolve({
                 data: mockData[table]?.slice(0, count) || [],
@@ -51,7 +54,8 @@ export function createMockSupabaseClient() {
               }),
           }),
         }),
-        order: (column: string, options?: any) => ({
+        // deno-lint-ignore no-explicit-any
+        order: (_column: string, _options?: any) => ({
           limit: (count: number) =>
             Promise.resolve({
               data: mockData[table]?.slice(0, count) || [],
@@ -64,6 +68,7 @@ export function createMockSupabaseClient() {
             error: null,
           }),
       }),
+      // deno-lint-ignore no-explicit-any
       insert: (data: any) => {
         const newData = Array.isArray(data) ? data : [data];
         newData.forEach((item) => {
@@ -80,7 +85,9 @@ export function createMockSupabaseClient() {
           }),
         };
       },
+      // deno-lint-ignore no-explicit-any
       update: (data: any) => ({
+        // deno-lint-ignore no-explicit-any
         eq: (column: string, value: any) =>
           Promise.resolve({
             data: null,
@@ -94,6 +101,7 @@ export function createMockSupabaseClient() {
 // Mock request helper
 export function createMockRequest(
   method: string,
+  // deno-lint-ignore no-explicit-any
   body?: any,
   headers?: Record<string, string>,
 ): Request {

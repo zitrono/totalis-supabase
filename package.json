@@ -11,6 +11,7 @@
     "test:client": "ts-node src/test-client/cli.ts",
     "test:scenarios": "ts-node src/test-client/cli.ts run-all",
     "test:new-user": "ts-node src/test-client/cli.ts new-user",
+    "test:audio": "ts-node src/test-client/cli.ts audio",
     "test:interactive": "ts-node src/test-client/cli.ts interactive",
     "test:auth": "ts-node scripts/test-auth.ts",
     "test:schema": "ts-node scripts/test-schema.ts",
