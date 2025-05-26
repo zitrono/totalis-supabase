@@ -39,7 +39,7 @@ export class TestUserService {
 
     // Create user profile if it doesn't exist
     const { data: profile, error } = await this.supabase
-      .from('user_profiles')
+      .from('profiles')
       .insert({
         id: user.id, // Use auth user ID as profile ID
         name: data.name,
@@ -68,7 +68,7 @@ export class TestUserService {
     }
 
     const { data: profile, error } = await this.supabase
-      .from('user_profiles')
+      .from('profiles')
       .select('*')
       .eq('id', user.id)
       .single();
@@ -91,7 +91,7 @@ export class TestUserService {
     }
 
     const { data: profile, error } = await this.supabase
-      .from('user_profiles')
+      .from('profiles')
       .update(updates)
       .eq('id', user.id)
       .select()
@@ -121,7 +121,7 @@ export class TestUserService {
     }
 
     const { error } = await this.supabase
-      .from('user_profiles')
+      .from('profiles')
       .delete()
       .eq('id', user.id);
 

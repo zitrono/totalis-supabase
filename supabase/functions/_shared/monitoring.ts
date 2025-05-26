@@ -1,333 +1,206 @@
-// Monitoring and analytics utilities for Edge Functions
-import { createClient } from "npm:@supabase/supabase-js@2.38.4";
+import { TestMetadata } from './test-data.ts'
 
-// Sentry integration (mock for now - will use Sentry Edge SDK when available)
-export class SentryClient {
-  private dsn: string;
-  private environment: string;
+interface SentryConfig {
+  dsn: string
+  environment: string
+  release?: string
+}
 
-  constructor() {
-    this.dsn = Deno.env.get("SENTRY_DSN") || "";
-    this.environment = Deno.env.get("DENO_ENV") || "production";
-  }
+interface PostHogConfig {
+  apiKey: string
+  apiHost: string
+}
 
-  async captureException(error: Error, context?: Record<string, any>) {
-    // In production, this would send to Sentry
-    console.error("[Sentry] Exception captured:", {
-      error: {
-        name: error.name,
-        message: error.message,
-        stack: error.stack,
-      },
-      context,
-      environment: this.environment,
-      timestamp: new Date().toISOString(),
-    });
-
-    // Store in database for now
-    try {
-      const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-      const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_KEY")!;
-      const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-      await supabase.from("error_logs").insert({
-        function_name: context?.functionName || "unknown",
-        error_message: error.message,
-        error_stack: error.stack,
-        error_type: error.name,
-        user_id: context?.userId,
-        request_data: context?.requestData,
-        environment: this.environment,
-        created_at: new Date().toISOString(),
-      });
-    } catch (logError) {
-      console.error("Failed to log error to database:", logError);
+// Initialize monitoring services with test awareness
+export function initializeMonitoring(testMetadata?: TestMetadata | null) {
+  const isTest = !!testMetadata
+  
+  // Sentry configuration
+  if (Deno.env.get('SENTRY_DSN')) {
+    const sentryConfig: SentryConfig = {
+      dsn: Deno.env.get('SENTRY_DSN')!,
+      environment: isTest ? 'test' : (Deno.env.get('ENVIRONMENT') || 'production'),
+      release: Deno.env.get('RELEASE_VERSION')
     }
+    
+    // In a real implementation, you would initialize Sentry here
+    // For now, we'll just log the config
+    console.log('Sentry initialized:', {
+      environment: sentryConfig.environment,
+      isTest
+    })
   }
-
-  async captureMessage(message: string, level: "info" | "warning" | "error" = "info") {
-    console.log(`[Sentry] ${level.toUpperCase()}: ${message}`);
-  }
-
-  setUser(user: { id: string; email?: string }) {
-    // In production, this would set the user context for Sentry
-    console.log("[Sentry] User context set:", user);
-  }
-
-  addBreadcrumb(breadcrumb: {
-    message: string;
-    category?: string;
-    level?: string;
-    data?: Record<string, any>;
-  }) {
-    console.log("[Sentry] Breadcrumb:", breadcrumb);
+  
+  // PostHog configuration
+  if (Deno.env.get('POSTHOG_API_KEY')) {
+    const posthogConfig: PostHogConfig = {
+      apiKey: Deno.env.get('POSTHOG_API_KEY')!,
+      apiHost: Deno.env.get('POSTHOG_API_HOST') || 'https://app.posthog.com'
+    }
+    
+    console.log('PostHog initialized:', {
+      apiHost: posthogConfig.apiHost,
+      isTest
+    })
   }
 }
 
-// PostHog integration
-export class PostHogClient {
-  private apiKey: string;
-  private host: string;
-
-  constructor() {
-    this.apiKey = Deno.env.get("POSTHOG_API_KEY") || "";
-    this.host = "https://app.posthog.com";
+// Capture error with test awareness
+export function captureError(error: Error, context: Record<string, any> = {}, testMetadata?: TestMetadata | null) {
+  const errorContext = {
+    ...context,
+    timestamp: new Date().toISOString(),
+    environment: Deno.env.get('ENVIRONMENT') || 'production'
   }
-
-  async capture(event: {
-    distinctId: string;
-    event: string;
-    properties?: Record<string, any>;
-  }) {
-    if (!this.apiKey) {
-      console.log("[PostHog] Event (no API key):", event);
-      return;
+  
+  if (testMetadata) {
+    errorContext.test = true
+    errorContext.test_run_id = testMetadata.test_run_id
+    errorContext.test_scenario = testMetadata.test_scenario
+    
+    // Don't send test errors to Sentry in production
+    if (Deno.env.get('ENVIRONMENT') === 'production') {
+      console.log('[TEST ERROR - Not sent to Sentry]:', error.message, errorContext)
+      return
     }
+  }
+  
+  // In production, this would send to Sentry
+  console.error('Error captured:', error.message, errorContext)
+  
+  // If Sentry is configured, send the error
+  if (Deno.env.get('SENTRY_DSN')) {
+    // Sentry.captureException(error, { extra: errorContext })
+  }
+}
 
-    try {
-      const response = await fetch(`${this.host}/capture`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          api_key: this.apiKey,
-          event: event.event,
-          distinct_id: event.distinctId,
-          properties: {
-            ...event.properties,
-            $lib: "deno",
-            $lib_version: "1.0.0",
-          },
-          timestamp: new Date().toISOString(),
-        }),
-      });
+// Track event with test awareness
+export function trackEvent(
+  eventName: string, 
+  properties: Record<string, any> = {}, 
+  userId?: string,
+  testMetadata?: TestMetadata | null
+) {
+  const eventData = {
+    event: eventName,
+    properties: {
+      ...properties,
+      timestamp: new Date().toISOString()
+    },
+    userId: userId || 'anonymous'
+  }
+  
+  if (testMetadata) {
+    eventData.properties.$test = true
+    eventData.properties.$test_run_id = testMetadata.test_run_id
+    eventData.properties.$test_scenario = testMetadata.test_scenario
+    
+    // Use test user ID to avoid polluting real user analytics
+    eventData.userId = `test_${testMetadata.test_run_id}`
+    
+    // Add test prefix to event name for easy filtering
+    eventData.event = `test_${eventName}`
+  }
+  
+  // Log event (in production, this would send to PostHog)
+  console.log('Event tracked:', eventData)
+  
+  // If PostHog is configured, send the event
+  if (Deno.env.get('POSTHOG_API_KEY')) {
+    // posthog.capture(eventData)
+  }
+}
 
-      if (!response.ok) {
-        throw new Error(`PostHog API error: ${response.statusText}`);
-      }
-    } catch (error) {
-      console.error("[PostHog] Failed to send event:", error);
+// Track performance metrics with test awareness
+export function trackPerformance(
+  metricName: string,
+  value: number,
+  unit: string = 'ms',
+  tags: Record<string, string> = {},
+  testMetadata?: TestMetadata | null
+) {
+  const metric = {
+    name: metricName,
+    value,
+    unit,
+    tags: {
+      ...tags,
+      environment: Deno.env.get('ENVIRONMENT') || 'production'
+    },
+    timestamp: new Date().toISOString()
+  }
+  
+  if (testMetadata) {
+    metric.tags.test = 'true'
+    metric.tags.test_run_id = testMetadata.test_run_id
+    metric.name = `test.${metricName}`
+  }
+  
+  // Log metric (in production, this would send to monitoring service)
+  console.log('Performance metric:', metric)
+  
+  // If Sentry is configured, track transaction
+  if (Deno.env.get('SENTRY_DSN')) {
+    // Sentry.trackTransaction(metric)
+  }
+}
+
+// Create a monitoring context for a function execution
+export function createMonitoringContext(functionName: string, testMetadata?: TestMetadata | null) {
+  const startTime = Date.now()
+  const context = {
+    functionName,
+    startTime,
+    testMetadata
+  }
+  
+  // Initialize monitoring with test awareness
+  initializeMonitoring(testMetadata)
+  
+  return {
+    // Track function start
+    trackStart: (userId?: string) => {
+      trackEvent(`function_${functionName}_start`, {
+        function: functionName
+      }, userId, testMetadata)
+    },
+    
+    // Track function success
+    trackSuccess: (userId?: string, additionalProps?: Record<string, any>) => {
+      const duration = Date.now() - startTime
       
-      // Store locally as fallback
-      try {
-        const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-        const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_KEY")!;
-        const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-        await supabase.from("analytics_events").insert({
-          user_id: event.distinctId,
-          event_type: event.event,
-          event_data: event.properties,
-          source: "posthog_fallback",
-          created_at: new Date().toISOString(),
-        });
-      } catch (fallbackError) {
-        console.error("Failed to store event locally:", fallbackError);
-      }
-    }
-  }
-
-  async identify(userId: string, properties?: Record<string, any>) {
-    await this.capture({
-      distinctId: userId,
-      event: "$identify",
-      properties,
-    });
-  }
-
-  async pageview(userId: string, pageName: string, properties?: Record<string, any>) {
-    await this.capture({
-      distinctId: userId,
-      event: "$pageview",
-      properties: {
-        $current_url: pageName,
-        ...properties,
-      },
-    });
-  }
-}
-
-// Performance monitoring
-export class PerformanceMonitor {
-  private startTime: number;
-  private functionName: string;
-  private userId?: string;
-
-  constructor(functionName: string, userId?: string) {
-    this.startTime = Date.now();
-    this.functionName = functionName;
-    this.userId = userId;
-  }
-
-  async end(metadata?: Record<string, any>) {
-    const duration = Date.now() - this.startTime;
-
-    // Log performance metrics
-    console.log(`[Performance] ${this.functionName} completed in ${duration}ms`);
-
-    // Store in analytics
-    try {
-      const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-      const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_KEY")!;
-      const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-      await supabase.from("performance_logs").insert({
-        function_name: this.functionName,
-        user_id: this.userId,
+      trackEvent(`function_${functionName}_success`, {
+        function: functionName,
         duration_ms: duration,
-        metadata,
-        created_at: new Date().toISOString(),
-      });
-    } catch (error) {
-      console.error("Failed to log performance metrics:", error);
-    }
-
-    return duration;
-  }
-}
-
-// Rate limiting helper
-export class RateLimiter {
-  private static instances = new Map<string, RateLimiter>();
-  private requests = new Map<string, number[]>();
-  private windowMs: number;
-  private maxRequests: number;
-
-  constructor(windowMs: number = 60000, maxRequests: number = 10) {
-    this.windowMs = windowMs;
-    this.maxRequests = maxRequests;
-  }
-
-  static getInstance(key: string, windowMs?: number, maxRequests?: number): RateLimiter {
-    if (!this.instances.has(key)) {
-      this.instances.set(key, new RateLimiter(windowMs, maxRequests));
-    }
-    return this.instances.get(key)!;
-  }
-
-  isAllowed(userId: string): boolean {
-    const now = Date.now();
-    const userRequests = this.requests.get(userId) || [];
+        ...additionalProps
+      }, userId, testMetadata)
+      
+      trackPerformance(`function.${functionName}.duration`, duration, 'ms', {
+        status: 'success'
+      }, testMetadata)
+    },
     
-    // Remove old requests outside the window
-    const validRequests = userRequests.filter(time => now - time < this.windowMs);
-    
-    if (validRequests.length >= this.maxRequests) {
-      return false;
-    }
-    
-    // Add current request
-    validRequests.push(now);
-    this.requests.set(userId, validRequests);
-    
-    return true;
-  }
-
-  getRemainingRequests(userId: string): number {
-    const now = Date.now();
-    const userRequests = this.requests.get(userId) || [];
-    const validRequests = userRequests.filter(time => now - time < this.windowMs);
-    
-    return Math.max(0, this.maxRequests - validRequests.length);
-  }
-}
-
-// Singleton instances
-export const sentry = new SentryClient();
-export const posthog = new PostHogClient();
-
-// Helper function to wrap edge function with monitoring
-export function withMonitoring(functionName: string, handler: Function) {
-  return async (req: Request) => {
-    const monitor = new PerformanceMonitor(functionName);
-    let userId: string | undefined;
-
-    try {
-      // Extract user ID if available
-      const authHeader = req.headers.get("Authorization");
-      if (authHeader) {
-        const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-        const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-        const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-          auth: {
-            autoRefreshToken: false,
-            persistSession: false,
-          },
-          global: {
-            headers: {
-              Authorization: authHeader,
-            },
-          },
-        });
-
-        const { data: { user } } = await supabase.auth.getUser();
-        userId = user?.id;
-
-        if (userId) {
-          sentry.setUser({ id: userId });
-          monitor.userId = userId;
-        }
-      }
-
-      // Add breadcrumb
-      sentry.addBreadcrumb({
-        message: `${functionName} started`,
-        category: "edge-function",
-        data: {
-          method: req.method,
-          url: req.url,
-        },
-      });
-
-      // Execute the actual handler
-      const response = await handler(req);
-
-      // Track successful execution
-      if (userId) {
-        await posthog.capture({
-          distinctId: userId,
-          event: `${functionName}_success`,
-          properties: {
-            status: response.status,
-            duration_ms: Date.now() - monitor.startTime,
-          },
-        });
-      }
-
-      await monitor.end({
-        status: response.status,
-        userId,
-      });
-
-      return response;
-    } catch (error) {
-      // Capture exception
-      await sentry.captureException(error, {
-        functionName,
-        userId,
-        requestData: await req.json().catch(() => ({})),
-      });
-
-      // Track error
-      if (userId) {
-        await posthog.capture({
-          distinctId: userId,
-          event: `${functionName}_error`,
-          properties: {
-            error: error.message,
-            duration_ms: Date.now() - monitor.startTime,
-          },
-        });
-      }
-
-      await monitor.end({
-        status: "error",
+    // Track function error
+    trackError: (error: Error, userId?: string) => {
+      const duration = Date.now() - startTime
+      
+      captureError(error, {
+        function: functionName,
+        duration_ms: duration
+      }, testMetadata)
+      
+      trackEvent(`function_${functionName}_error`, {
+        function: functionName,
         error: error.message,
-        userId,
-      });
-
-      throw error;
-    }
-  };
+        duration_ms: duration
+      }, userId, testMetadata)
+      
+      trackPerformance(`function.${functionName}.duration`, duration, 'ms', {
+        status: 'error'
+      }, testMetadata)
+    },
+    
+    // Get context for logging
+    getContext: () => context
+  }
 }

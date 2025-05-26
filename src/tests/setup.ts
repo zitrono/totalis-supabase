@@ -10,3 +10,6 @@ if (!process.env.SUPABASE_URL) {
 
 // Set test timeout
 jest.setTimeout(30000);
+
+// Setup global fetch for tests
+require('whatwg-fetch');

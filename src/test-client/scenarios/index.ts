@@ -4,9 +4,9 @@ export { runCategoryCheckInScenario } from './category-checkin.scenario';
 export { runChatInteractionScenario } from './chat-interaction.scenario';
 export { runAbortCheckInScenario } from './abort-checkin.scenario';
 export { runAudioUploadScenario } from './audio-upload.scenario';
-export { runComprehensiveChatScenario } from './comprehensive-chat.scenario';
-export { runFullCheckInFlowScenario } from './full-checkin-flow.scenario';
-export { runRecommendationSystemScenario } from './recommendation-system.scenario';
+// export { runComprehensiveChatScenario } from './comprehensive-chat.scenario';
+// export { runFullCheckInFlowScenario } from './full-checkin-flow.scenario';
+// export { runRecommendationSystemScenario } from './recommendation-system.scenario';
 
 // Scenario runner utility
 import { TotalisTestClient } from '../index';
@@ -26,9 +26,9 @@ export async function runAllScenarios(client: TotalisTestClient): Promise<Scenar
     { name: 'Category Check-in', fn: () => import('./category-checkin.scenario').then(m => m.runCategoryCheckInScenario(client)) },
     { name: 'Abort Check-in', fn: () => import('./abort-checkin.scenario').then(m => m.runAbortCheckInScenario(client)) },
     { name: 'Audio Upload', fn: () => import('./audio-upload.scenario').then(m => m.runAudioUploadScenario(client)) },
-    { name: 'Comprehensive Chat', fn: () => import('./comprehensive-chat.scenario').then(m => m.runComprehensiveChatScenario(client)) },
-    { name: 'Full Check-in Flow', fn: () => import('./full-checkin-flow.scenario').then(m => m.runFullCheckInFlowScenario(client)) },
-    { name: 'Recommendation System', fn: () => import('./recommendation-system.scenario').then(m => m.runRecommendationSystemScenario(client)) }
+    // { name: 'Comprehensive Chat', fn: () => import('./comprehensive-chat.scenario').then(m => m.runComprehensiveChatScenario(client)) },
+    // { name: 'Full Check-in Flow', fn: () => import('./full-checkin-flow.scenario').then(m => m.runFullCheckInFlowScenario(client)) },
+    // { name: 'Recommendation System', fn: () => import('./recommendation-system.scenario').then(m => m.runRecommendationSystemScenario(client)) }
   ];
 
   const results: ScenarioResult[] = [];

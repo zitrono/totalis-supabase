@@ -11,7 +11,7 @@ export interface CheckIn {
   id: string;
   userId: string;
   categoryId: string;
-  status: "in_progress" | "completed" | "abandoned";
+  status: 'in_progress' | 'completed' | 'abandoned';
   startedAt: string;
   completedAt?: string;
   responses?: CheckInResponse[];
@@ -43,13 +43,13 @@ export interface ChatMessage {
   message: string;
   isUser: boolean;
   timestamp: string;
-  contextType?: "category" | "checkin" | "recommendation";
+  contextType?: 'category' | 'checkin' | 'recommendation';
   contextId?: string;
 }
 
 export interface AnalyticsSummary {
   userId: string;
-  period: "week" | "month" | "all";
+  period: 'week' | 'month' | 'all';
   totalCheckIns: number;
   completedCheckIns: number;
   topCategories: CategoryStat[];
@@ -66,40 +66,11 @@ export interface CategoryStat {
 
 export interface LangflowRequest {
   prompt: string;
-  // deno-lint-ignore no-explicit-any
   context: Record<string, any>;
-  type: "recommendation" | "checkin" | "chat" | "analytics";
+  type: 'recommendation' | 'checkin' | 'chat' | 'analytics';
 }
 
 export interface LangflowResponse {
-  // deno-lint-ignore no-explicit-any
   result: any;
-  // deno-lint-ignore no-explicit-any
   metadata?: Record<string, any>;
-}
-
-export interface CheckInQuestion {
-  question: string;
-  questionNumber: number;
-  totalQuestions: number;
-  isComplete: boolean;
-  responseType: 'scale' | 'text' | 'choice';
-}
-
-export interface AIResponse {
-  text: string;
-  suggestions: string[];
-  confidence: number;
-  processingTimeMs: number;
-  coachPersonality: string;
-  followUp: boolean;
-}
-
-export interface CheckInSummary {
-  wellnessLevel: number;
-  insights: string[];
-  summary: string;
-  recommendations: string[];
-  improvementTips: string[];
-  nextCheckInSuggestion: string;
 }

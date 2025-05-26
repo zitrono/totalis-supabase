@@ -49,19 +49,6 @@ jobs:
 
   test-integration:
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: supabase/postgres:15.1.0.117
-        env:
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: postgres
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
     
     steps:
       - uses: actions/checkout@v4
@@ -75,15 +62,35 @@ jobs:
       - name: Install dependencies
         run: npm ci
       
-      - name: Run Migration Tests
+      - name: Check Test Data Volume (Pre-test)
         env:
-          SUPABASE_URL: http://localhost:54321
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+          ENVIRONMENT: test
+        run: npm run test:monitor
+      
+      - name: Run Remote Integration Tests
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          ENVIRONMENT: test
+          TEST_CLEANUP_STRATEGY: immediate
         run: |
           npm run test:connection
-          npm run test
+          npm run test:remote
+      
+      - name: Clean Test Data (Post-test)
+        if: always()
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          ENVIRONMENT: test
+        run: |
+          npm run test:cleanup:dry
+          npm run test:cleanup -- --older-than "1 hour"
 
   deploy:
     needs: [test-edge-functions, test-integration]

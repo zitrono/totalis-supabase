@@ -13,7 +13,7 @@ export class TestChatService {
 
     // Get user's coach
     const { data: profile } = await this.supabase
-      .from('user_profiles')
+      .from('profiles')
       .select('coach_id')
       .eq('id', user.id)
       .single();
@@ -94,7 +94,7 @@ export class TestChatService {
     }
 
     const { data: profile } = await this.supabase
-      .from('user_profiles')
+      .from('profiles')
       .select('coach_id')
       .eq('id', user.id)
       .single();
@@ -129,7 +129,7 @@ export class TestChatService {
     }
 
     const { data: profile } = await this.supabase
-      .from('user_profiles')
+      .from('profiles')
       .select('coach_id')
       .eq('id', user.id)
       .single();

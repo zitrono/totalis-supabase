@@ -47,7 +47,7 @@ describe('TestAuthService', () => {
 
       expect(mockSupabase.auth.signInAnonymously).toHaveBeenCalled();
       expect(result.user.id).toBe('test-user-id');
-      expect(result.user.email).toBeUndefined();
+      expect(result.user.email).toBeNull();
     });
 
     it('should throw error when anonymous sign-in fails', async () => {

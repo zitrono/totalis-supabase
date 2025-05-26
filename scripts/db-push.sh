@@ -1,21 +1,20 @@
 #!/bin/bash
-# Script to push database migrations
+# Script to push database migrations with proper authentication
 
-cd /Users/zitrono/dev/totalis-supabase
-
-echo "Pushing database migrations..."
-echo "When prompted for password, enter: 4-ever-young-"
-echo ""
-
-# Use expect to handle password prompt
-if command -v expect &> /dev/null; then
-    expect -c '
-    spawn npx supabase db push
-    expect "Enter your database password:"
-    send "4-ever-young-\r"
-    expect eof
-    '
+# Load database password from .env.local
+if [ -f .env.local ]; then
+    source .env.local
 else
-    echo "Please enter password when prompted: 4-ever-young-"
-    npx supabase db push
+    echo "Error: .env.local file not found"
+    echo "Please create .env.local with SUPABASE_DB_PASSWORD=your-password"
+    exit 1
 fi
+
+# Check if password is set
+if [ -z "$SUPABASE_DB_PASSWORD" ]; then
+    echo "Error: SUPABASE_DB_PASSWORD not set in .env.local"
+    exit 1
+fi
+
+echo "Pushing database migrations to remote Supabase..."
+./supabase-cli db push

@@ -1,0 +1,14 @@
+# supabase-cli
+
+This is the Supabase CLI binary, renamed from `supabase` to `supabase-cli` to avoid conflicts with the `/supabase/` directory.
+
+To use the Supabase CLI, you can:
+- Use `npx supabase` (recommended)
+- Or use `./supabase-cli` directly
+
+The file was renamed to prevent the error:
+```
+mkdir: supabase: Not a directory
+```
+
+This is the official Supabase CLI downloaded from their releases.

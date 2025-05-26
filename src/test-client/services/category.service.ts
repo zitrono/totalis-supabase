@@ -53,7 +53,7 @@ export class TestCategoryService {
     }
 
     const { data: userCategories, error } = await this.supabase
-      .from('user_categories')
+      .from('profile_categories')
       .select('*')
       .eq('user_id', user.id);
 
@@ -72,7 +72,7 @@ export class TestCategoryService {
     }
 
     const { data: userCategory, error } = await this.supabase
-      .from('user_categories')
+      .from('profile_categories')
       .select('*')
       .eq('user_id', user.id)
       .eq('category_id', categoryId)
@@ -97,7 +97,7 @@ export class TestCategoryService {
 
     // Upsert user category
     const { data: userCategory, error } = await this.supabase
-      .from('user_categories')
+      .from('profile_categories')
       .upsert({
         user_id: user.id,
         category_id: categoryId,
@@ -121,7 +121,7 @@ export class TestCategoryService {
     }
 
     const { data: userCategory, error } = await this.supabase
-      .from('user_categories')
+      .from('profile_categories')
       .update({ is_favorite: false })
       .eq('user_id', user.id)
       .eq('category_id', categoryId)
@@ -143,7 +143,7 @@ export class TestCategoryService {
     }
 
     const { data: favorites, error } = await this.supabase
-      .from('user_categories')
+      .from('profile_categories')
       .select('category_id')
       .eq('user_id', user.id)
       .eq('is_favorite', true);
@@ -177,7 +177,7 @@ export class TestCategoryService {
     }
 
     const { data: shortcuts, error } = await this.supabase
-      .from('user_categories')
+      .from('profile_categories')
       .select('category_id')
       .eq('user_id', user.id)
       .eq('is_shortcut', true);

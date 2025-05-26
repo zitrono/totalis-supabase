@@ -30,6 +30,16 @@ export class TotalisTestClient {
     this.audioService = new TestAudioService(supabaseClient);
   }
 
+  // Public getters for services
+  get auth() { return this.authService; }
+  get user() { return this.userService; }
+  get chat() { return this.chatService; }
+  get checkIn() { return this.checkInService; }
+  get card() { return this.cardService; }
+  get category() { return this.categoryService; }
+  get audio() { return this.audioService; }
+  get supabase() { return this.supabaseClient; }
+
   // Authentication methods
   async signInAnonymously() {
     return this.authService.signInAnonymously();

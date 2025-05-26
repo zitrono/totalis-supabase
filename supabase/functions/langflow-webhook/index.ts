@@ -1,62 +1,58 @@
-import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-import { corsHeaders } from "../_shared/cors.ts";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { corsHeaders } from "../_shared/cors.ts"
+import { extractTestMetadata } from "../_shared/test-data.ts"
 
 serve(async (req) => {
   // Handle CORS
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    const payload = await req.json();
-
-    console.log("Langflow webhook received:", {
-      timestamp: new Date().toISOString(),
-      method: req.method,
-      headers: Object.fromEntries(req.headers.entries()),
-      payload,
-    });
-
-    // Echo the request back
-    // TODO: When Langflow is integrated, this will:
-    // 1. Validate the webhook signature
-    // 2. Process the AI response
-    // 3. Update relevant database records
-    // 4. Trigger any necessary follow-up actions
-
+    const payload = await req.json()
+    const testMetadata = extractTestMetadata(req)
+    
+    // Log webhook receipt
+    console.log('Langflow webhook received:', {
+      flowId: payload.flowId,
+      isTest: !!testMetadata,
+      testRunId: testMetadata?.test_run_id
+    })
+    
+    // Echo the payload back (mock implementation)
+    // In production, this would process the Langflow response
     const response = {
       received: true,
-      timestamp: new Date().toISOString(),
       echo: payload,
-      message:
-        "Webhook received successfully. This endpoint will process Langflow AI responses.",
-    };
-
+      timestamp: new Date().toISOString(),
+      ...(testMetadata && { testMetadata })
+    }
+    
     return new Response(
       JSON.stringify(response),
-      {
-        headers: {
-          ...corsHeaders,
-          "Content-Type": "application/json",
+      { 
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json' 
         },
-        status: 200,
-      },
-    );
+        status: 200
+      }
+    )
   } catch (error) {
-    console.error("Webhook error:", error);
-
+    console.error('Langflow webhook error:', error)
+    
     return new Response(
-      JSON.stringify({
-        error: "Invalid webhook payload",
-        details: error.message,
+      JSON.stringify({ 
+        error: error.message,
+        timestamp: new Date().toISOString()
       }),
-      {
-        headers: {
-          ...corsHeaders,
-          "Content-Type": "application/json",
+      { 
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json' 
         },
-        status: 400,
-      },
-    );
+        status: 400
+      }
+    )
   }
-});
+})

@@ -58,6 +58,18 @@ describe('TestCheckInService', () => {
             question: 'How would you rate your overall health today?',
             type: 'radio',
             options: ['Excellent', 'Good', 'Fair', 'Poor']
+          },
+          {
+            id: '2',
+            question: 'Which areas of health are you most concerned about?',
+            type: 'checkbox',
+            options: ['Physical', 'Mental', 'Emotional', 'Social', 'Spiritual']
+          },
+          {
+            id: '3',
+            question: 'How well have you been sleeping?',
+            type: 'radio',
+            options: ['Very well', 'Well', 'Poorly', 'Very poorly']
           }
         ],
         created_at: '2024-01-01T00:00:00Z'
@@ -85,7 +97,32 @@ describe('TestCheckInService', () => {
         user_id: 'test-user-id',
         category_id: categoryId,
         status: 'in_progress',
-        questions: expect.any(Array),
+        questions: [
+          {
+            id: '1',
+            question: 'How would you rate your overall health today?',
+            type: 'radio',
+            options: ['Excellent', 'Good', 'Fair', 'Poor']
+          },
+          {
+            id: '2',
+            question: 'Which areas of health are you most concerned about?',
+            type: 'checkbox',
+            options: ['Physical', 'Mental', 'Emotional', 'Social', 'Spiritual']
+          },
+          {
+            id: '3',
+            question: 'How well have you been sleeping?',
+            type: 'radio',
+            options: ['Very well', 'Well', 'Poorly', 'Very poorly']
+          },
+          {
+            id: '4',
+            question: 'How satisfied are you with your progress in this area?',
+            type: 'radio',
+            options: ['Very satisfied', 'Satisfied', 'Neutral', 'Dissatisfied', 'Very dissatisfied']
+          }
+        ],
         created_at: '2024-01-01T00:00:00Z'
       };
 

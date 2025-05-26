@@ -1,361 +1,462 @@
-import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-import { corsHeaders } from "../_shared/cors.ts";
-import {
-  createSupabaseClient,
-  getUserContext,
-} from "../_shared/supabase-client.ts";
-import { LangflowClient } from "../_shared/langflow-client.ts";
-import { CheckInResponse, CheckInQuestion, CheckInSummary } from "../_shared/types.ts";
+import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
+import { corsHeaders } from '../_shared/cors.ts'
 
-const langflowClient = new LangflowClient();
+// Types
+interface CheckinStartRequest {
+  categoryId: string
+  action: 'start'
+}
+
+interface CheckinCompleteRequest {
+  checkinId: string
+  answers: Record<string, string>
+  action: 'complete'
+}
+
+type CheckinRequest = CheckinStartRequest | CheckinCompleteRequest
+
+interface CheckinQuestion {
+  id: string
+  question: string
+  type: 'text' | 'scale' | 'multiple_choice'
+  options?: string[]
+  required: boolean
+}
+
+interface CheckinStartResponse {
+  checkin: {
+    id: string
+    category_id: string
+    status: string
+    created_at: string
+  }
+  questions: CheckinQuestion[]
+}
+
+interface CheckinCompleteResponse {
+  recommendations: Array<{
+    id: string
+    title: string
+    recommendation_text: string
+    action: string
+    why: string
+    category_id: string
+    importance: number
+  }>
+  insights: {
+    summary: string
+    wellness_level: number
+    key_themes: string[]
+  }
+}
 
 serve(async (req) => {
   // Handle CORS
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
   }
 
   try {
     // Get auth header
-    const authHeader = req.headers.get("Authorization");
+    const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
       return new Response(
-        JSON.stringify({ error: "No authorization header" }),
-        {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 401,
-        },
-      );
+        JSON.stringify({ error: 'Authorization required' }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 401
+        }
+      )
     }
 
-    // Create Supabase client with user auth
-    const supabase = createSupabaseClient(authHeader);
-
+    // Create Supabase client
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      { 
+        global: { headers: { Authorization: authHeader } },
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
+    )
+    
     // Get authenticated user
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const token = authHeader.replace('Bearer ', '')
+    const { data: { user }, error: userError } = await supabase.auth.getUser(token)
     if (userError || !user) {
       return new Response(
-        JSON.stringify({ error: "Invalid authentication" }),
-        {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 401,
-        },
-      );
+        JSON.stringify({ error: 'Invalid authentication' }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 401
+        }
+      )
     }
 
     // Get request body
-    const { 
-      checkInId, 
-      answer,
-      action = "continue", // continue, complete, abandon
-      voiceEnabled = false,
-    } = await req.json();
-
-    if (!checkInId) {
-      return new Response(
-        JSON.stringify({ error: "Check-in ID is required" }),
-        {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 400,
-        },
-      );
-    }
-
-    // Verify check-in exists and belongs to user
-    const { data: checkIn, error: checkInError } = await supabase
-      .from("checkins")
-      .select(`
-        *,
-        categories (
-          id,
-          name,
-          description,
-          checkin_prompt,
-          max_questions
-        ),
-        user_categories (
-          id,
-          is_favorite,
-          custom_name,
-          custom_color
-        )
-      `)
-      .eq("id", checkInId)
-      .eq("user_id", user.id)
-      .single();
-
-    if (checkInError || !checkIn) {
-      return new Response(
-        JSON.stringify({ error: "Check-in not found" }),
-        {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 404,
-        },
-      );
-    }
-
-    // Validate check-in status
-    if (checkIn.status === "completed") {
-      return new Response(
-        JSON.stringify({ error: "Check-in already completed" }),
-        {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 400,
-        },
-      );
-    }
-
-    if (checkIn.status === "abandoned") {
-      return new Response(
-        JSON.stringify({ error: "Check-in was abandoned" }),
-        {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 400,
-        },
-      );
-    }
-
-    // Handle abandon action
-    if (action === "abandon") {
-      const { error: abandonError } = await supabase
-        .from("checkins")
-        .update({
-          status: "abandoned",
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", checkInId);
-
-      if (abandonError) {
-        throw abandonError;
-      }
-
-      return new Response(
-        JSON.stringify({
-          checkInId,
-          status: "abandoned",
-          message: "Check-in abandoned",
-        }),
-        {
-          headers: {
-            ...corsHeaders,
-            "Content-Type": "application/json",
-          },
-          status: 200,
-        },
-      );
-    }
-
-    // Get user context
-    const context = await getUserContext(supabase, user.id);
-
-    // Get existing responses
-    const existingResponses = checkIn.responses || [];
+    const body = await req.json() as CheckinRequest
     
-    // Add new response if provided
-    if (answer) {
-      const currentQuestion = existingResponses.length + 1;
-      
-      const response: CheckInResponse = {
-        questionId: crypto.randomUUID(),
-        question: `Question ${currentQuestion}`, // This will be enhanced with actual question text
-        answer,
-        timestamp: new Date().toISOString(),
-      };
-
-      existingResponses.push(response);
-
-      // Update check-in with new response
-      const { error: updateError } = await supabase
-        .from("checkins")
-        .update({
-          responses: existingResponses,
-          current_question: currentQuestion + 1,
-          completion_percentage: Math.round((currentQuestion / (checkIn.total_questions || 5)) * 100),
-          status: "in_progress",
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", checkInId);
-
-      if (updateError) {
-        throw updateError;
-      }
+    // Handle start action
+    if (body.action === 'start') {
+      return handleStartCheckin(supabase, user.id, body.categoryId)
     }
-
-    // Determine if check-in should be completed
-    const shouldComplete = action === "complete" || 
-                         existingResponses.length >= (checkIn.categories?.max_questions || 5);
-
-    if (shouldComplete) {
-      // Generate check-in summary
-      const summary: CheckInSummary = await langflowClient.generateCheckInSummary(
-        existingResponses.map(r => r.answer),
-        checkIn.categories?.name || "General",
-        context
-      );
-
-      // Complete the check-in
-      const { error: completeError } = await supabase
-        .from("checkins")
-        .update({
-          status: "completed",
-          wellness_level: summary.wellnessLevel,
-          summary: summary.summary,
-          insights: summary.insights.join("\n"),
-          completion_percentage: 100,
-          completed_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", checkInId);
-
-      if (completeError) {
-        throw completeError;
-      }
-
-      // Update user_category stats if applicable
-      if (checkIn.user_category_id) {
-        // The trigger will handle updating stats automatically
-      }
-
-      // Create recommendations based on check-in
-      if (summary.recommendations.length > 0) {
-        const recommendationsToInsert = summary.recommendations.map(rec => ({
-          user_id: user.id,
-          category_id: checkIn.category_id,
-          checkin_id: checkInId,
-          title: rec,
-          description: `Based on your ${checkIn.categories?.name} check-in`,
-          recommendation_type: "checkin_based",
-          relevance_score: summary.wellnessLevel < 5 ? 8 : 6,
-          priority_level: summary.wellnessLevel < 3 ? "high" : "medium",
-          is_active: true,
-          created_at: new Date().toISOString(),
-        }));
-
-        await supabase
-          .from("recommendations")
-          .insert(recommendationsToInsert);
-      }
-
-      // Log analytics event
-      await supabase.from("analytics_events").insert({
-        user_id: user.id,
-        event_type: "checkin_completed",
-        event_data: {
-          checkin_id: checkInId,
-          category_id: checkIn.category_id,
-          wellness_level: summary.wellnessLevel,
-          question_count: existingResponses.length,
-          duration_minutes: Math.round(
-            (new Date().getTime() - new Date(checkIn.started_at).getTime()) / 60000
-          ),
-        },
-        created_at: new Date().toISOString(),
-      });
-
-      // Return completion response
-      return new Response(
-        JSON.stringify({
-          checkInId,
-          status: "completed",
-          summary: {
-            wellnessLevel: summary.wellnessLevel,
-            insights: summary.insights,
-            summary: summary.summary,
-            recommendations: summary.recommendations.slice(0, 3),
-            improvementTips: summary.improvementTips,
-            nextCheckInSuggestion: summary.nextCheckInSuggestion,
-          },
-          totalQuestions: existingResponses.length,
-          completionTime: new Date().toISOString(),
-        }),
-        {
-          headers: {
-            ...corsHeaders,
-            "Content-Type": "application/json",
-          },
-          status: 200,
-        },
-      );
-    } else {
-      // Get next question
-      const previousAnswers = existingResponses.map(r => r.answer);
-      const nextQuestion: CheckInQuestion = await langflowClient.processCheckIn(
-        checkIn.categories?.checkin_prompt || "How are you feeling?",
-        previousAnswers,
-        context
-      );
-
-      // Update total questions if not set
-      if (!checkIn.total_questions) {
-        await supabase
-          .from("checkins")
-          .update({
-            total_questions: nextQuestion.totalQuestions,
-          })
-          .eq("id", checkInId);
-      }
-
-      // Return next question
-      return new Response(
-        JSON.stringify({
-          checkInId,
-          status: "in_progress",
-          nextQuestion: {
-            text: nextQuestion.question,
-            number: nextQuestion.questionNumber,
-            total: nextQuestion.totalQuestions,
-            responseType: nextQuestion.responseType,
-          },
-          progress: {
-            current: existingResponses.length,
-            total: nextQuestion.totalQuestions,
-            percentage: Math.round((existingResponses.length / nextQuestion.totalQuestions) * 100),
-          },
-          canComplete: existingResponses.length >= 3, // Allow early completion after 3 questions
-        }),
-        {
-          headers: {
-            ...corsHeaders,
-            "Content-Type": "application/json",
-          },
-          status: 200,
-        },
-      );
+    
+    // Handle complete action
+    if (body.action === 'complete') {
+      return handleCompleteCheckin(supabase, user.id, body.checkinId, body.answers)
     }
-  } catch (error) {
-    console.error("Check-in process error:", error);
-
-    // Log error for monitoring
-    try {
-      const supabase = createSupabaseClient(req.headers.get("Authorization")!);
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (user) {
-        await supabase.from("error_logs").insert({
-          user_id: user.id,
-          function_name: "checkin-process",
-          error_message: error.message,
-          error_stack: error.stack,
-          request_data: await req.json().catch(() => ({})),
-          created_at: new Date().toISOString(),
-        });
-      }
-    } catch (logError) {
-      console.error("Failed to log error:", logError);
-    }
-
+    
+    // Invalid action
     return new Response(
-      JSON.stringify({
-        error: "Failed to process check-in",
-        details: error.message,
+      JSON.stringify({ error: 'Invalid action. Must be "start" or "complete"' }),
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400
+      }
+    )
+    
+  } catch (error) {
+    console.error('Check-in process error:', error)
+    
+    return new Response(
+      JSON.stringify({ 
+        error: 'Failed to process check-in',
+        details: error.message 
       }),
-      {
-        headers: {
+      { 
+        headers: { 
           ...corsHeaders,
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json'
         },
-        status: 500,
-      },
-    );
+        status: 500
+      }
+    )
   }
-});
+})
+
+async function handleStartCheckin(
+  supabase: any, 
+  userId: string, 
+  categoryId: string
+): Promise<Response> {
+  // Get category info
+  const { data: category, error: categoryError } = await supabase
+    .from('categories')
+    .select('*')
+    .eq('id', categoryId)
+    .single()
+    
+  if (categoryError || !category) {
+    return new Response(
+      JSON.stringify({ error: 'Category not found' }),
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 404
+      }
+    )
+  }
+  
+  // Create check-in record
+  const { data: checkin, error: checkinError } = await supabase
+    .from('checkins')
+    .insert({
+      user_id: userId,
+      category_id: categoryId,
+      status: 'in_progress',
+      started_at: new Date().toISOString(),
+      metadata: {}
+    })
+    .select()
+    .single()
+    
+  if (checkinError) {
+    console.error('Error creating check-in:', checkinError)
+    return new Response(
+      JSON.stringify({ error: 'Failed to create check-in' }),
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500
+      }
+    )
+  }
+  
+  // Generate questions based on category (mocked for now)
+  const questions = await generateCheckinQuestions(category, userId)
+  
+  const response: CheckinStartResponse = {
+    checkin: {
+      id: checkin.id,
+      category_id: checkin.category_id,
+      status: checkin.status,
+      created_at: checkin.started_at
+    },
+    questions
+  }
+  
+  return new Response(
+    JSON.stringify(response),
+    { 
+      headers: { 
+        ...corsHeaders,
+        'Content-Type': 'application/json'
+      },
+      status: 200
+    }
+  )
+}
+
+async function handleCompleteCheckin(
+  supabase: any,
+  userId: string,
+  checkinId: string,
+  answers: Record<string, string>
+): Promise<Response> {
+  // Verify check-in exists and belongs to user
+  const { data: checkin, error: checkinError } = await supabase
+    .from('checkins')
+    .select('*')
+    .eq('id', checkinId)
+    .eq('user_id', userId)
+    .eq('status', 'in_progress')
+    .single()
+    
+  if (checkinError || !checkin) {
+    return new Response(
+      JSON.stringify({ error: 'Check-in not found or already completed' }),
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 404
+      }
+    )
+  }
+  
+  // Process answers and generate insights (mocked for now)
+  const insights = await processCheckinAnswers(answers, checkin.category_id)
+  
+  // Update check-in with completion data
+  const { error: updateError } = await supabase
+    .from('checkins')
+    .update({
+      status: 'completed',
+      completed_at: new Date().toISOString(),
+      wellness_level: insights.wellness_level,
+      summary: insights.summary,
+      answers: answers,
+      metadata: {
+        key_themes: insights.key_themes
+      }
+    })
+    .eq('id', checkinId)
+    
+  if (updateError) {
+    console.error('Error updating check-in:', updateError)
+    return new Response(
+      JSON.stringify({ error: 'Failed to complete check-in' }),
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500
+      }
+    )
+  }
+  
+  // Generate recommendations based on insights
+  const recommendations = await generateRecommendations(
+    userId,
+    checkin.category_id,
+    checkinId,
+    insights
+  )
+  
+  // Save recommendations to database
+  if (recommendations.length > 0) {
+    const { error: recError } = await supabase
+      .from('recommendations')
+      .insert(
+        recommendations.map(rec => ({
+          ...rec,
+          user_id: userId,
+          checkin_id: checkinId,
+          category_id: checkin.category_id,
+          is_active: true,
+          created_at: new Date().toISOString()
+        }))
+      )
+      
+    if (recError) {
+      console.error('Error saving recommendations:', recError)
+    }
+  }
+  
+  const response: CheckinCompleteResponse = {
+    recommendations,
+    insights
+  }
+  
+  return new Response(
+    JSON.stringify(response),
+    { 
+      headers: { 
+        ...corsHeaders,
+        'Content-Type': 'application/json'
+      },
+      status: 200
+    }
+  )
+}
+
+// Generate check-in questions based on category
+async function generateCheckinQuestions(
+  category: any,
+  userId: string
+): Promise<CheckinQuestion[]> {
+  // TODO: Replace with AI-generated questions based on category and user history
+  
+  const baseQuestions: CheckinQuestion[] = [
+    {
+      id: 'wellness_level',
+      question: `On a scale of 1-10, how would you rate your ${category.name} today?`,
+      type: 'scale',
+      required: true
+    },
+    {
+      id: 'current_state',
+      question: `What's happening with your ${category.name} right now?`,
+      type: 'text',
+      required: true
+    },
+    {
+      id: 'challenges',
+      question: 'What challenges are you facing?',
+      type: 'text',
+      required: true
+    },
+    {
+      id: 'support_needed',
+      question: 'What kind of support would be most helpful?',
+      type: 'multiple_choice',
+      options: [
+        'Practical tips',
+        'Emotional support',
+        'Accountability',
+        'Resources',
+        'Just someone to listen'
+      ],
+      required: true
+    },
+    {
+      id: 'next_step',
+      question: 'What\'s one small step you could take today?',
+      type: 'text',
+      required: false
+    }
+  ]
+  
+  // Customize questions based on category prompts if available
+  if (category.prompt_checkin) {
+    baseQuestions[1].question = category.prompt_checkin
+  }
+  if (category.prompt_checkin_2) {
+    baseQuestions.splice(2, 0, {
+      id: 'category_specific',
+      question: category.prompt_checkin_2,
+      type: 'text',
+      required: true
+    })
+  }
+  
+  return baseQuestions
+}
+
+// Process check-in answers and generate insights
+async function processCheckinAnswers(
+  answers: Record<string, string>,
+  categoryId: string
+): Promise<{
+  summary: string
+  wellness_level: number
+  key_themes: string[]
+}> {
+  // TODO: Replace with AI analysis of answers
+  
+  const wellnessLevel = parseInt(answers.wellness_level) || 5
+  
+  // Mock insights based on wellness level
+  let summary = ''
+  let key_themes: string[] = []
+  
+  if (wellnessLevel >= 7) {
+    summary = 'You\'re doing well! Your responses show positive progress and good self-awareness.'
+    key_themes = ['strength', 'progress', 'self-care']
+  } else if (wellnessLevel >= 4) {
+    summary = 'You\'re managing, but there\'s room for improvement. Your honesty about challenges is a great first step.'
+    key_themes = ['awareness', 'balance', 'growth']
+  } else {
+    summary = 'You\'re going through a tough time. Remember that seeking support is a sign of strength.'
+    key_themes = ['support', 'compassion', 'small-steps']
+  }
+  
+  return {
+    summary,
+    wellness_level: wellnessLevel,
+    key_themes
+  }
+}
+
+// Generate personalized recommendations
+async function generateRecommendations(
+  userId: string,
+  categoryId: string,
+  checkinId: string,
+  insights: any
+): Promise<Array<{
+  title: string
+  recommendation_text: string
+  action: string
+  why: string
+  recommendation_type: string
+  importance: number
+}>> {
+  // TODO: Replace with AI-generated recommendations
+  
+  const recommendations = []
+  
+  // Generate recommendations based on wellness level and themes
+  if (insights.wellness_level < 4) {
+    recommendations.push({
+      title: 'Reach out for support',
+      recommendation_text: 'Consider talking to a friend, family member, or professional about what you\'re experiencing.',
+      action: 'Schedule a conversation with someone you trust',
+      why: 'Connection and support are essential when we\'re struggling',
+      recommendation_type: 'action',
+      importance: 5
+    })
+  }
+  
+  if (insights.key_themes.includes('self-care')) {
+    recommendations.push({
+      title: 'Celebrate your progress',
+      recommendation_text: 'Take a moment to acknowledge how far you\'ve come.',
+      action: 'Write down three things you\'re proud of',
+      why: 'Recognizing progress reinforces positive patterns',
+      recommendation_type: 'action',
+      importance: 3
+    })
+  }
+  
+  // Always add at least one recommendation
+  if (recommendations.length === 0) {
+    recommendations.push({
+      title: 'Continue your wellness journey',
+      recommendation_text: 'Keep checking in regularly to track your progress.',
+      action: 'Set a reminder for your next check-in',
+      why: 'Consistent check-ins help maintain awareness and growth',
+      recommendation_type: 'action',
+      importance: 2
+    })
+  }
+  
+  return recommendations
+}

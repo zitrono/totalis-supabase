@@ -183,3 +183,15 @@ export interface TestStep {
   expectedResult?: any;
   validate?: (result: any) => boolean;
 }
+
+// Scenario types
+export interface ScenarioResult {
+  success: boolean;
+  logs: string[];
+  error?: string;
+}
+
+export interface TestUser {
+  user: User;
+  session?: any;
+}

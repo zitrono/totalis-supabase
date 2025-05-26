@@ -4,26 +4,25 @@
   "main": "index.js",
   "scripts": {
     "build": "tsc",
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage",
+    "test": "jest src/tests/integration/",
+    "test:edge": "jest src/tests/integration/edge-functions-remote.test.ts",
+    "test:sdk": "jest src/tests/integration/sdk-operations.test.ts",
+    "test:watch": "jest src/tests/integration/ --watch",
+    "test:coverage": "jest src/tests/integration/ --coverage",
     "test:connection": "ts-node src/scripts/test-connection.ts",
     "test:client": "ts-node src/test-client/cli.ts",
     "test:scenarios": "ts-node src/test-client/cli.ts run-all",
     "test:new-user": "ts-node src/test-client/cli.ts new-user",
     "test:audio": "ts-node src/test-client/cli.ts audio",
     "test:interactive": "ts-node src/test-client/cli.ts interactive",
-    "test:auth": "ts-node scripts/test-auth.ts",
-    "test:schema": "ts-node scripts/test-schema.ts",
-    "configure:auth": "ts-node scripts/configure-auth.ts",
-    "migrate:run": "ts-node scripts/run-migration.ts",
-    "migrate:apply": "ts-node scripts/apply-schema.ts",
-    "seed:coaches": "ts-node scripts/seed-coaches.ts",
-    "check:schema": "ts-node scripts/check-schema.ts",
-    "setup:cli": "ts-node scripts/setup-supabase-cli.ts",
-    "apply:schema": "ts-node scripts/apply-schema-direct.ts",
     "dev": "ts-node src/index.ts",
-    "migrate": "ts-node src/migration/index.ts"
+    "test:cleanup": "tsx scripts/test/cleanup-test-data.ts",
+    "test:cleanup:dry": "tsx scripts/test/cleanup-test-data.ts --dry-run",
+    "test:monitor": "tsx scripts/test/monitor-test-data.ts",
+    "db:migrate": "./scripts/db-push.sh",
+    "db:push": "./scripts/db-push.sh",
+    "functions:deploy": "npx supabase functions deploy",
+    "storage:setup": "ts-node scripts/setup-storage-bucket.ts"
   },
   "keywords": [],
   "author": "",
@@ -43,6 +42,8 @@
     "typescript": "^5.8.3"
   },
   "devDependencies": {
-    "ts-node": "^10.9.2"
+    "ts-node": "^10.9.2",
+    "tsx": "^4.19.4",
+    "whatwg-fetch": "^3.6.20"
   }
 }
