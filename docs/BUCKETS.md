@@ -52,26 +52,31 @@ category-icons/
 - Public read access for all users
 - Service role only for write operations
 
-### 3. voice-recordings (Private)
+### 3. voice-messages (Private)
 
-**Purpose**: Stores user audio recordings from check-ins for AI transcription
+**Purpose**: Stores voice messages for chat conversations and TTS audio
 
 **Structure**:
 ```
-voice-recordings/
-└── [user-id]/
-    └── [timestamp]-[checksum].{mp3|wav|webm|ogg}
+voice-messages/
+├── [user-id]/              # User voice messages
+│   └── [timestamp].webm    # Voice recordings
+└── tts/                    # Text-to-speech audio
+    └── [user-id]/
+        └── [timestamp].mp3 # Generated TTS files
 ```
 
 **Configuration**:
 - Public: `false`
-- Allowed MIME types: `audio/mp3`, `audio/wav`, `audio/webm`, `audio/ogg`
-- File size limit: 15MB (approximately 60 seconds of audio)
-- Access: Users can only access their own recordings
+- Allowed MIME types: `audio/webm`, `audio/mp3`, `audio/wav`, `audio/ogg`, `audio/mpeg`
+- File size limit: 10MB
+- Access: Users can access their own messages and messages in their conversations
 
 **RLS Policies**:
 - Users can upload to their own folder
-- Users can read/update/delete their own recordings
+- Users can access voice messages in conversations they're part of
+- Users can access TTS audio (for coach responses)
+- Users can update/delete their own recordings
 - Service role has full access
 
 ### 4. user-images (Public)
@@ -148,6 +153,7 @@ const { data } = supabase.storage
 All bucket configurations and RLS policies are managed through SQL migrations:
 - `20250527000000_create_storage_buckets.sql` - Creates user-images bucket
 - `20250527000001_fix_user_images_policies.sql` - Fixes RLS policies for user-images
+- `20240529000008_create_voice_storage.sql` - Creates voice-messages bucket and policies
 
 ## Testing
 
