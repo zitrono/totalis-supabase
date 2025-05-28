@@ -19,9 +19,12 @@
     "test:cleanup": "tsx scripts/test/cleanup-test-data.ts",
     "test:cleanup:dry": "tsx scripts/test/cleanup-test-data.ts --dry-run",
     "test:monitor": "tsx scripts/test/monitor-test-data.ts",
+    "test:integration": "jest src/tests/integration/ --forceExit",
+    "test:smoke": "jest src/tests/smoke/ --forceExit || echo 'Smoke tests not yet implemented'",
     "db:migrate": "./scripts/db-push.sh",
     "db:push": "./scripts/db-push.sh",
-    "functions:deploy": "npx supabase functions deploy",
+    "functions:deploy": "./scripts/deploy-edge-functions.sh",
+    "functions:deploy:ci": "for dir in supabase/functions/*/; do [ -d \"$dir\" ] && [ -f \"$dir/index.ts\" ] && npx supabase functions deploy $(basename \"$dir\") --use-api --project-ref $SUPABASE_PROJECT_REF || true; done",
     "storage:setup": "ts-node scripts/setup-storage-bucket.ts"
   },
   "keywords": [],

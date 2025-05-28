@@ -87,12 +87,27 @@ main() {
     # Check environment variables
     check_env_vars
     
-    # Deploy checkin-process function
-    deploy_function "checkin-process"
-    
-    print_success "Deployment completed successfully!"
-    echo ""
-    echo "Function URL: https://${SUPABASE_PROJECT_ID}.functions.supabase.co/checkin-process"
+    # Check if specific function is provided as argument
+    if [ $# -eq 1 ]; then
+        # Deploy specific function
+        deploy_function "$1"
+        echo ""
+        echo "Function URL: https://${SUPABASE_PROJECT_ID}.functions.supabase.co/$1"
+    else
+        # Deploy all functions
+        print_info "Deploying all edge functions..."
+        
+        # Loop through all function directories
+        for function_dir in supabase/functions/*/; do
+            if [ -d "$function_dir" ] && [ -f "$function_dir/index.ts" ]; then
+                function_name=$(basename "$function_dir")
+                deploy_function "$function_name"
+                echo ""
+            fi
+        done
+        
+        print_success "All functions deployed successfully!"
+    fi
 }
 
 # Run main function
