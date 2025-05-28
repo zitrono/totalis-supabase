@@ -153,7 +153,7 @@ jobs:
               fi
               
               # Check for required type references
-              if ! head -3 "$function_dir/index.ts" | grep -q "reference lib=\"deno.ns\""; then
+              if ! head -5 "$function_dir/index.ts" | grep -q 'reference lib="deno.ns"'; then
                 echo "❌ Missing Deno type reference in: $function_name"
                 echo "Add: /// <reference lib=\"deno.ns\" /> at the top"
                 exit 1
