@@ -37,7 +37,7 @@ export async function getUserContext(supabase: any, userId: string): Promise<Use
     .limit(10)
 
   // Get unique recent categories
-  const recentCategories = [...new Set(recentCheckIns?.map(c => c.category_id) || [])]
+  const recentCategories = [...new Set(recentCheckIns?.map(c => c.category_id as string) || [])]
 
   // Get check-in history
   const { data: checkInHistory } = await supabase

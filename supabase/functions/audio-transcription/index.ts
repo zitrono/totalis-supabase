@@ -224,10 +224,11 @@ serve(async (req) => {
                 language: result.language,
               }
             } catch (error) {
+              const errorMessage = error instanceof Error ? error.message : 'Transcription failed'
               return {
                 id: item.id,
                 text: '',
-                error: error.message || 'Transcription failed',
+                error: errorMessage,
               }
             }
           })
@@ -294,11 +295,12 @@ serve(async (req) => {
     )
 
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Transcription failed'
     console.error('Audio transcription error:', error)
     
     const response: TranscriptionResponse = {
       text: '',
-      error: error.message || 'Transcription failed',
+      error: errorMessage,
     }
     
     return new Response(
