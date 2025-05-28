@@ -1,6 +1,9 @@
 -- Fix RLS policies to allow service role full access
 -- This resolves "permission denied" errors when service role tries to insert data
 
+-- Enable RLS on recommendations table if not already enabled
+ALTER TABLE recommendations ENABLE ROW LEVEL SECURITY;
+
 -- Ensure RLS is properly configured for recommendations table
 -- Drop existing policies if they exist
 DROP POLICY IF EXISTS "Users can view own recommendations" ON recommendations;
