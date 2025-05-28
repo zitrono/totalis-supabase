@@ -165,7 +165,7 @@ jobs:
           echo "✅ All static validations passed!"
           echo "validation_passed=true" >> $GITHUB_OUTPUT
           
-          # Create a comment on the PR
+          # Try to create a comment on the PR (optional, don't fail if it can't)
           gh pr comment ${{ github.event.pull_request.number }} \
             --body "✅ **Pre-preview validation passed!**
             
@@ -184,7 +184,7 @@ jobs:
             Or use the GitHub CLI:
             \`\`\`bash
             gh workflow run preview.yml -f pr_number=${{ github.event.pull_request.number }}
-            \`\`\`"
+            \`\`\`" || echo "Note: Could not post PR comment (insufficient permissions)"
         env:
           GH_TOKEN: ${{ github.token }}
 
@@ -199,6 +199,6 @@ jobs:
             
             Please fix the validation errors above before a preview environment can be created.
             
-            Once fixed, push your changes and validation will run again automatically."
+            Once fixed, push your changes and validation will run again automatically." || echo "Note: Could not post PR comment (insufficient permissions)"
         env:
           GH_TOKEN: ${{ github.token }}
