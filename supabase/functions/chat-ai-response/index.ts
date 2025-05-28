@@ -168,12 +168,13 @@ serve(async (req) => {
       }
     )
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error)
     console.error('Chat AI response error:', error)
     
     return new Response(
       JSON.stringify({ 
         error: 'Failed to process chat message',
-        details: error.message 
+        details: errorMessage 
       }),
       { 
         headers: { 
