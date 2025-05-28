@@ -1,11 +1,9 @@
 import { createClient } from '@supabase/supabase-js'
 import { getTestConfig } from '../config/test-env'
-import { TestDataManager } from '../helpers/test-data'
 import { randomUUID } from 'crypto'
 
 const config = getTestConfig()
 const supabase = createClient(config.supabaseUrl, config.supabaseServiceKey)
-const testDataManager = new TestDataManager(supabase, config)
 
 describe.skip('Database Views', () => {
   // TODO: Fix permission errors - "permission denied for table users"
@@ -25,7 +23,7 @@ describe.skip('Database Views', () => {
         photo_url: 'https://example.com/coach.jpg',
         sex: 'female',
         year_of_birth: 1980,
-        metadata: { test: true, testRunId: config.testRunId }
+        metadata: { test: true, test_run: Date.now() }
       })
       .select()
       .single()
@@ -41,8 +39,16 @@ describe.skip('Database Views', () => {
     testCategoryId = category.id
     
     // Use pre-created test user
-    const { user } = await testDataManager.usePreCreatedTestUser()
-    testUserId = user!.id
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+      email: 'test2@totalis.test',
+      password: 'Test123!@#'
+    })
+    
+    if (authError) {
+      throw new Error(`Failed to sign in with test user: ${authError.message}`)
+    }
+    
+    testUserId = authData.user!.id
     
     // Create profile with coach
     await supabase
@@ -51,7 +57,7 @@ describe.skip('Database Views', () => {
         id: testUserId,
         name: 'Test User',
         coach_id: testCoachId,
-        metadata: { test: true, testRunId: config.testRunId }
+        metadata: { test: true, test_run: Date.now() }
       })
   })
 
@@ -61,8 +67,6 @@ describe.skip('Database Views', () => {
       .from('coaches')
       .delete()
       .eq('id', testCoachId)
-    
-    await testDataManager.cleanupTestRun()
   })
 
   describe('user_profiles_with_coaches view', () => {
@@ -93,7 +97,7 @@ describe.skip('Database Views', () => {
           user_id: testUserId,
           category_id: testCategoryId,
           is_favorite: true,
-          metadata: { test: true, testRunId: config.testRunId }
+          metadata: { test: true, test_run: Date.now() }
         })
     })
 
@@ -143,7 +147,7 @@ describe.skip('Database Views', () => {
           recommendation_type: 'action',
           importance: 3,
           is_active: true,
-          metadata: { test: true, testRunId: config.testRunId }
+          metadata: { test: true, test_run: Date.now() }
         })
         .select()
         .single()
@@ -204,7 +208,7 @@ describe.skip('Database Views', () => {
           summary: 'Test checkin summary',
           started_at: new Date().toISOString(),
           completed_at: new Date().toISOString(),
-          metadata: { test: true, testRunId: config.testRunId }
+          metadata: { test: true, test_run: Date.now() }
         })
         .select()
         .single()
@@ -238,7 +242,7 @@ describe.skip('Database Views', () => {
           category_id: testCategoryId,
           status: 'in_progress',
           started_at: new Date().toISOString(),
-          metadata: { test: true, testRunId: config.testRunId }
+          metadata: { test: true, test_run: Date.now() }
         })
         .select()
         .single()
@@ -267,7 +271,7 @@ describe.skip('Database Views', () => {
           content: 'Hello from your coach!',
           coach_id: testCoachId,
           conversation_id: randomUUID(),
-          metadata: { test: true, testRunId: config.testRunId }
+          metadata: { test: true, test_run: Date.now() }
         })
         .select()
         .single()
@@ -304,7 +308,7 @@ describe.skip('Database Views', () => {
           content: 'Hello coach!',
           coach_id: testCoachId,
           conversation_id: randomUUID(),
-          metadata: { test: true, testRunId: config.testRunId }
+          metadata: { test: true, test_run: Date.now() }
         })
         .select()
         .single()

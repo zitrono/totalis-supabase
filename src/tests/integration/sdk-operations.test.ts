@@ -1,22 +1,17 @@
 import { describe, test, expect, beforeAll, afterAll, beforeEach } from '@jest/globals'
 import { createClient, SupabaseClient, User } from '@supabase/supabase-js'
-import { TestDataManager } from '../helpers/test-data'
 import { getTestConfig, logTestConfig } from '../config/test-env'
 import * as fs from 'fs'
 import * as path from 'path'
 
 describe('SDK Operations - Priority 1 Mobile Migration', () => {
   let supabase: SupabaseClient
-  let testDataManager: TestDataManager
   let testUser: User | null = null
-  let testRunId: string
   let testImagePath: string
 
   beforeAll(async () => {
     const config = getTestConfig()
     logTestConfig(config)
-    
-    testRunId = config.testRunId
     
     supabase = createClient(config.supabaseUrl, config.supabaseServiceKey, {
       auth: {
@@ -24,8 +19,6 @@ describe('SDK Operations - Priority 1 Mobile Migration', () => {
         persistSession: false
       }
     })
-    
-    testDataManager = new TestDataManager(supabase, config)
     
     // Create test image file
     testImagePath = path.join(__dirname, 'test-image.png')
@@ -151,7 +144,7 @@ describe('SDK Operations - Priority 1 Mobile Migration', () => {
   describe('Storage Operations', () => {
     // Skip storage tests if bucket doesn't exist
     const bucketName = 'user-images'
-    let testFileName = `test-${testRunId}/test-image.png`
+    let testFileName = `test-${Date.now()}/test-image.png`
     
     beforeEach(async () => {
       // Ensure authenticated for storage operations

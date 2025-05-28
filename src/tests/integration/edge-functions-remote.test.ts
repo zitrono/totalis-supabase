@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from '@jest/globals'
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
-import { TestDataManager } from '../helpers/test-data'
 import { getTestConfig, logTestConfig, TestConfig } from '../config/test-env'
 
 describe.skip('Edge Functions Remote Integration Tests', () => {
@@ -8,7 +7,6 @@ describe.skip('Edge Functions Remote Integration Tests', () => {
   // Need to ensure edge functions are deployed and accessible
   let supabase: SupabaseClient
   let adminSupabase: SupabaseClient
-  let testManager: TestDataManager
   let config: TestConfig
   let testUser: any
   let authToken: string
@@ -36,23 +34,19 @@ describe.skip('Edge Functions Remote Integration Tests', () => {
       config.supabaseAnonKey
     )
 
-    // Initialize test data manager
-    testManager = new TestDataManager(adminSupabase, config)
-
-    // Show initial test data state
-    if (config.testMode === 'remote') {
-      console.log('📊 Initial test data summary:')
-      const summary = await testManager.getTestDataSummary()
-      summary.forEach((row: any) => {
-        console.log(`  ${row.table_name}: ${row.count} test records`)
-      })
-    }
-
     // Use pre-created test user to avoid rate limits
     console.log('🔐 Signing in with pre-created test user...')
-    const userData = await testManager.usePreCreatedTestUser('edge-function-test')
-    testUser = userData.user
-    authToken = userData.session?.access_token || ''
+    const { data: authData, error } = await supabase.auth.signInWithPassword({
+      email: 'test3@totalis.test',
+      password: 'Test123!@#'
+    })
+    
+    if (error) {
+      throw new Error(`Failed to sign in with test user: ${error.message}`)
+    }
+    
+    testUser = authData.user
+    authToken = authData.session?.access_token || ''
     console.log('✅ Signed in successfully')
   })
 
