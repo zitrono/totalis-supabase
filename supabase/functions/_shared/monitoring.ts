@@ -116,11 +116,21 @@ export function isMonitoringEnabled(): boolean {
 }
 
 // Create monitoring context for a request
-export function createMonitoringContext(req: Request) {
+export function createMonitoringContext(functionName: string, metadata?: any) {
   return {
-    method: req.method,
-    url: req.url,
-    headers: Object.fromEntries(req.headers.entries()),
-    timestamp: new Date().toISOString()
+    functionName,
+    metadata,
+    timestamp: new Date().toISOString(),
+    trackSuccess: (data?: any) => {
+      trackEvent(`${functionName}.success`, { ...data, ...metadata })
+    },
+    trackError: (error: Error | string) => {
+      const err = error instanceof Error ? error : new Error(String(error))
+      captureError(err, { functionName, ...metadata })
+      trackEvent(`${functionName}.error`, { 
+        error: err.message, 
+        ...metadata 
+      })
+    }
   }
 }

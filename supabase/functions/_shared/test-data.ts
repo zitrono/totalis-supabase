@@ -15,9 +15,10 @@ export interface TestMetadata {
 /**
  * Gets test metadata if running in test environment
  */
-export function getTestMetadata(): TestMetadata | undefined {
+export function getTestMetadata(req?: Request): TestMetadata | undefined {
   const isTest = Deno.env.get('ENVIRONMENT') === 'test' || 
-                 Deno.env.get('IS_TEST') === 'true'
+                 Deno.env.get('IS_TEST') === 'true' ||
+                 (req && req.headers.get('X-Test-Mode') === 'true')
   
   if (!isTest) {
     return undefined
@@ -25,7 +26,7 @@ export function getTestMetadata(): TestMetadata | undefined {
   
   return {
     test: true,
-    test_run_id: Deno.env.get('TEST_RUN_ID') || `test-${Date.now()}`,
+    test_run_id: Deno.env.get('TEST_RUN_ID') || req?.headers.get('X-Test-Run-ID') || `test-${Date.now()}`,
     test_timestamp: new Date().toISOString(),
     test_environment: 'edge-function'
   }
