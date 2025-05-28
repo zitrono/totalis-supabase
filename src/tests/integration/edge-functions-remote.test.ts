@@ -162,10 +162,10 @@ describe('Edge Functions Remote Integration Tests', () => {
           'Authorization': `Bearer ${authToken}`
         },
         body: JSON.stringify({
-          checkInId,
-          question: 'How are you feeling?',
-          answer: 'Good, thanks!',
-          isComplete: false
+          action: 'answer',
+          checkin_id: checkInId,
+          question_id: 'q1',
+          answer: 'Good, thanks!'
         })
       })
 
@@ -187,10 +187,9 @@ describe('Edge Functions Remote Integration Tests', () => {
           'Authorization': `Bearer ${authToken}`
         },
         body: JSON.stringify({
-          checkInId,
-          question: 'Any final thoughts?',
-          answer: 'All good!',
-          isComplete: true
+          action: 'complete',
+          checkin_id: checkInId,
+          answer: 'All good!'
         })
       })
 
