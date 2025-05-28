@@ -305,7 +305,7 @@ describe('SDK Operations - Priority 1 Mobile Migration', () => {
       const profileData = {
         id: testUser!.id, // profiles.id references auth.users.id
         year_of_birth: 1990,
-        sex: 'non-binary', // Note: must use hyphen, not underscore
+        sex: 'male', // Only 'male' or 'female' allowed
         notification_settings: {
           email: true,
           push: false,

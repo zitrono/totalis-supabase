@@ -4,7 +4,7 @@
 INSERT INTO coaches (name, bio, sex, is_active) VALUES
   ('Daniel', 'Your supportive wellness coach focused on holistic health and mindfulness.', 'male', true),
   ('Sarah', 'An empathetic guide specializing in mental health and emotional wellbeing.', 'female', true),
-  ('Alex', 'A balanced coach who integrates physical and mental wellness strategies.', 'non_binary', true)
+  ('Alex', 'A balanced coach who integrates physical and mental wellness strategies.', 'female', true)
 ON CONFLICT DO NOTHING;
 
 -- Insert app configuration
