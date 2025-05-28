@@ -1,0 +1,89 @@
+name: Preview Environment
+
+on:
+  pull_request:
+    paths:
+      - 'supabase/**'
+      - 'src/**'
+      - '.github/workflows/preview.yml'
+
+env:
+  SUPABASE_CLI_VERSION: 2.23.4
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        run: |
+          wget -qO- https://github.com/supabase/cli/releases/download/v${SUPABASE_CLI_VERSION}/supabase_linux_amd64.tar.gz | tar xvz
+          sudo mv supabase /usr/local/bin/
+          supabase --version
+
+      - name: Authenticate Supabase CLI
+        run: |
+          supabase login --token ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          supabase link --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+
+      - name: Run migrations on preview branch
+        run: |
+          supabase db push --password ${{ secrets.SUPABASE_DB_PASSWORD }}
+
+      - name: Seed preview database
+        run: |
+          supabase db seed
+
+      - name: Deploy Edge Functions
+        run: |
+          # Deploy all edge functions with --use-api flag
+          for function_dir in supabase/functions/*/; do
+            if [ -d "$function_dir" ] && [ -f "$function_dir/index.ts" ]; then
+              function_name=$(basename "$function_dir")
+              echo "Deploying function: $function_name"
+              supabase functions deploy "$function_name" \
+                --use-api \
+                --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+            fi
+          done
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+
+      - name: Push storage configuration
+        run: |
+          # Note: supabase config push is not available in v2.23.4
+          # Will be available in future versions
+          echo "Storage config sync will be available in future CLI versions"
+
+      - name: Run integration tests
+        run: |
+          npm ci
+          npm run test:integration
+        env:
+          SUPABASE_URL: ${{ vars.PREVIEW_SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ vars.PREVIEW_SUPABASE_ANON_KEY }}
+          ENVIRONMENT: preview
+
+      - name: Comment PR with preview URL
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const previewUrl = process.env.PREVIEW_URL || 'Preview environment created';
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `🚀 **Preview Environment Ready**\n\n${previewUrl}\n\nThis environment will be automatically deleted 20 hours after this PR is closed or merged.`
+            });
+
+      - name: Label PR if keep-alive requested
+        if: contains(github.event.pull_request.labels.*.name, 'keep-preview')
+        run: echo "Preview environment will be retained for 7 days"

@@ -1,0 +1,160 @@
+name: Validate Supabase Assets
+
+on:
+  pull_request:
+    paths:
+      - 'supabase/**'
+      - '.github/workflows/validate.yml'
+
+env:
+  SUPABASE_CLI_VERSION: 2.23.4
+
+jobs:
+  validate-migrations:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check migration naming convention
+        run: |
+          # Check all migration files follow naming convention
+          for file in supabase/migrations/*.sql; do
+            if [ -f "$file" ]; then
+              filename=$(basename "$file")
+              
+              # Check format: YYYYMMDDHHMMSS_prefix_description.sql
+              if ! [[ "$filename" =~ ^[0-9]{14}_(feat_|fix_|refactor_|hf_)[a-z0-9_]+\.sql$ ]]; then
+                echo "❌ Invalid migration filename: $filename"
+                echo "Expected format: YYYYMMDDHHMMSS_prefix_description.sql"
+                echo "Prefixes: feat_, fix_, refactor_, hf_"
+                exit 1
+              fi
+              
+              # Check description length (max 50 chars after timestamp)
+              description="${filename:15}"
+              description_length=${#description}
+              if [ $description_length -gt 54 ]; then  # 50 chars + .sql
+                echo "❌ Migration description too long: $filename"
+                echo "Max 50 characters after timestamp"
+                exit 1
+              fi
+            fi
+          done
+          echo "✅ All migrations follow naming convention"
+
+      - name: Validate SQL syntax
+        run: |
+          # Basic SQL syntax validation
+          for file in supabase/migrations/*.sql; do
+            if [ -f "$file" ]; then
+              echo "Checking SQL syntax in: $(basename "$file")"
+              
+              # Check for common SQL syntax errors
+              if grep -E ";;|^[[:space:]]*$" "$file"; then
+                echo "❌ Found potential SQL syntax error in: $file"
+                exit 1
+              fi
+              
+              # Check for required patterns
+              if ! grep -q "IF NOT EXISTS\|IF EXISTS\|OR REPLACE" "$file"; then
+                echo "⚠️  Warning: Migration may not be idempotent: $file"
+              fi
+            fi
+          done
+          echo "✅ SQL syntax validation passed"
+
+  validate-functions:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v1
+        with:
+          deno-version: v1.x
+
+      - name: Check Edge Functions structure
+        run: |
+          # Verify each function has required files
+          for function_dir in supabase/functions/*/; do
+            if [ -d "$function_dir" ]; then
+              function_name=$(basename "$function_dir")
+              
+              # Check for index.ts
+              if [ ! -f "$function_dir/index.ts" ]; then
+                echo "❌ Missing index.ts in function: $function_name"
+                exit 1
+              fi
+              
+              echo "✅ Function structure valid: $function_name"
+            fi
+          done
+
+      - name: Type check Edge Functions
+        run: |
+          # Type check all TypeScript files
+          for function_dir in supabase/functions/*/; do
+            if [ -d "$function_dir" ] && [ -f "$function_dir/index.ts" ]; then
+              function_name=$(basename "$function_dir")
+              echo "Type checking function: $function_name"
+              
+              cd "$function_dir"
+              deno check index.ts || exit 1
+              cd -
+            fi
+          done
+          echo "✅ All functions pass type checking"
+
+      - name: Check for secret validation
+        run: |
+          # Ensure functions validate required secrets
+          for function_dir in supabase/functions/*/; do
+            if [ -d "$function_dir" ] && [ -f "$function_dir/index.ts" ]; then
+              function_name=$(basename "$function_dir")
+              
+              # Check if function uses env vars and validates them
+              if grep -q "Deno.env.get" "$function_dir/index.ts"; then
+                if ! grep -q "throw.*Error.*Missing" "$function_dir/index.ts"; then
+                  echo "⚠️  Warning: Function '$function_name' may not validate secrets"
+                fi
+              fi
+            fi
+          done
+
+  validate-config:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate config.toml
+        run: |
+          # Check if config.toml exists
+          if [ ! -f "supabase/config.toml" ]; then
+            echo "❌ Missing supabase/config.toml"
+            exit 1
+          fi
+          
+          # Basic TOML validation
+          if ! python3 -c "import tomli; tomli.load(open('supabase/config.toml', 'rb'))" 2>/dev/null; then
+            # Fallback to basic syntax check
+            if grep -E "^\[.*\[|^[^#]*=.*=|^\s*\]" "supabase/config.toml"; then
+              echo "❌ Invalid TOML syntax in config.toml"
+              exit 1
+            fi
+          fi
+          
+          echo "✅ config.toml is valid"
+
+      - name: Check seed.sql exists
+        run: |
+          if [ ! -f "supabase/seed.sql" ]; then
+            echo "❌ Missing mandatory supabase/seed.sql"
+            exit 1
+          fi
+          echo "✅ seed.sql exists"
