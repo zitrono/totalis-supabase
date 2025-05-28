@@ -56,19 +56,6 @@ describe.skip('Edge Functions Remote Integration Tests', () => {
   })
 
   afterAll(async () => {
-    // Cleanup test data
-    if (config.cleanupStrategy === 'immediate') {
-      console.log('\n🧹 Running test cleanup...')
-      await testManager.cleanupTestRun()
-      
-      // Wait for cleanup to complete
-      await testManager.waitForCleanup()
-    } else {
-      console.log('\n📌 Test data retained for debugging')
-      console.log(`  Test Run ID: ${config.testRunId}`)
-      console.log(`  Cleanup Strategy: ${config.cleanupStrategy}`)
-    }
-
     // Sign out
     await supabase.auth.signOut()
   })
@@ -84,7 +71,7 @@ describe.skip('Edge Functions Remote Integration Tests', () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...testManager.getTestHeaders()
+          'Authorization': `Bearer ${authToken}`
         },
         body: JSON.stringify(payload)
       })
@@ -94,11 +81,7 @@ describe.skip('Edge Functions Remote Integration Tests', () => {
       expect(data.received).toBe(true)
       expect(data.echo).toEqual(payload)
       
-      // Verify test metadata is included
-      if (config.testMode === 'remote') {
-        expect(data.testMetadata).toBeDefined()
-        expect(data.testMetadata.test_run_id).toBe(config.testRunId)
-      }
+      // Test data exists in preview instance
     })
   })
 
@@ -108,7 +91,7 @@ describe.skip('Edge Functions Remote Integration Tests', () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...testManager.getTestHeaders()
+          'Authorization': `Bearer ${authToken}`
         },
         body: JSON.stringify({ count: 3 })
       })
@@ -121,8 +104,7 @@ describe.skip('Edge Functions Remote Integration Tests', () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authToken}`,
-          ...testManager.getTestHeaders()
+          'Authorization': `Bearer ${authToken}`
         },
         body: JSON.stringify({ count: 3 })
       })
@@ -132,20 +114,7 @@ describe.skip('Edge Functions Remote Integration Tests', () => {
       expect(Array.isArray(data.recommendations)).toBe(true)
       expect(data.recommendations.length).toBeLessThanOrEqual(3)
 
-      // Verify test data was stored
-      if (config.testMode === 'remote') {
-        const { data: dbRecs } = await adminSupabase
-          .from('recommendations')
-          .select('metadata')
-          .eq('user_id', testUser.id)
-          .limit(1)
-          .single()
-        
-        if (dbRecs) {
-          expect(dbRecs.metadata.test).toBe(true)
-          expect(dbRecs.metadata.test_run_id).toBe(config.testRunId)
-        }
-      }
+      // Test data created in preview instance
     })
   })
 
@@ -173,8 +142,7 @@ describe.skip('Edge Functions Remote Integration Tests', () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authToken}`,
-          ...testManager.getTestHeaders()
+          'Authorization': `Bearer ${authToken}`
         },
         body: JSON.stringify({ categoryId })
       })
@@ -185,17 +153,7 @@ describe.skip('Edge Functions Remote Integration Tests', () => {
       expect(Array.isArray(data.questions)).toBe(true)
       checkInId = data.checkIn.id
 
-      // Verify test metadata
-      if (config.testMode === 'remote') {
-        const { data: dbCheckin } = await adminSupabase
-          .from('checkins')
-          .select('metadata')
-          .eq('id', checkInId)
-          .single()
-        
-        expect(dbCheckin?.metadata.test).toBe(true)
-        expect(dbCheckin?.metadata.test_run_id).toBe(config.testRunId)
-      }
+      // Test data created in preview instance
     })
 
     it('should process check-in response', async () => {
@@ -203,8 +161,7 @@ describe.skip('Edge Functions Remote Integration Tests', () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authToken}`,
-          ...testManager.getTestHeaders()
+          'Authorization': `Bearer ${authToken}`
         },
         body: JSON.stringify({
           checkInId,
@@ -229,8 +186,7 @@ describe.skip('Edge Functions Remote Integration Tests', () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authToken}`,
-          ...testManager.getTestHeaders()
+          'Authorization': `Bearer ${authToken}`
         },
         body: JSON.stringify({
           checkInId,
@@ -249,21 +205,7 @@ describe.skip('Edge Functions Remote Integration Tests', () => {
       expect(data.status).toBe('completed')
       expect(Array.isArray(data.recommendations)).toBe(true)
 
-      // Verify messages have test metadata
-      if (config.testMode === 'remote') {
-        const { data: messages } = await adminSupabase
-          .from('messages')
-          .select('metadata')
-          .eq('user_id', testUser.id)
-          .limit(1)
-        
-        if (messages && messages.length > 0) {
-          expect(messages[0].metadata.test).toBe(true)
-          // The message might be from this run or a recent run
-          expect(messages[0].metadata.test_run_id).toBeDefined()
-          expect(messages[0].metadata.test_run_id).toMatch(/^test_/)
-        }
-      }
+      // Messages created in preview instance
     })
   })
 
@@ -273,8 +215,7 @@ describe.skip('Edge Functions Remote Integration Tests', () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authToken}`,
-          ...testManager.getTestHeaders()
+          'Authorization': `Bearer ${authToken}`
         },
         body: JSON.stringify({ period: 'week' })
       })
@@ -313,8 +254,7 @@ describe.skip('Edge Functions Remote Integration Tests', () => {
       const response = await fetch(`${config.supabaseUrl}/functions/v1/audio-transcribe`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${authToken}`,
-          ...testManager.getTestHeaders()
+          'Authorization': `Bearer ${authToken}`
         },
         body: formData
       })
@@ -345,8 +285,7 @@ describe.skip('Edge Functions Remote Integration Tests', () => {
       const response = await fetch(`${config.supabaseUrl}/functions/v1/audio-transcribe`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${authToken}`,
-          ...testManager.getTestHeaders()
+          'Authorization': `Bearer ${authToken}`
         },
         body: formData
       })
@@ -380,8 +319,7 @@ describe.skip('Edge Functions Remote Integration Tests', () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authToken}`,
-          ...testManager.getTestHeaders()
+          'Authorization': `Bearer ${authToken}`
         },
         body: JSON.stringify({
           message: 'I need help with stress management',
@@ -415,8 +353,7 @@ describe.skip('Edge Functions Remote Integration Tests', () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authToken}`,
-          ...testManager.getTestHeaders()
+          'Authorization': `Bearer ${authToken}`
         },
         body: JSON.stringify({
           categoryId: 'stress-management'
@@ -431,8 +368,7 @@ describe.skip('Edge Functions Remote Integration Tests', () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authToken}`,
-          ...testManager.getTestHeaders()
+          'Authorization': `Bearer ${authToken}`
         },
         body: JSON.stringify({
           message: 'What should I do next?',
@@ -458,40 +394,4 @@ describe.skip('Edge Functions Remote Integration Tests', () => {
     })
   })
 
-  describe('Test Data Cleanup', () => {
-    it('should preview cleanup without deleting', async () => {
-      // Create some test data
-      await testManager.createTestUser('cleanup-test')
-      
-      // Preview cleanup
-      const { data: previewData } = await adminSupabase.rpc('cleanup_test_data', {
-        p_test_run_id: config.testRunId,
-        p_dry_run: true
-      })
-
-      expect(Array.isArray(previewData)).toBe(true)
-      
-      console.log('🔍 Cleanup preview:')
-      previewData.forEach((row: any) => {
-        console.log(`  Would delete ${row.records_deleted} records from ${row.table_name}`)
-      })
-    })
-
-    it('should track cleanup operations', async () => {
-      // Check cleanup log
-      const { data: logs } = await adminSupabase
-        .from('test_cleanup_log')
-        .select('*')
-        .eq('test_run_id', config.testRunId)
-        .order('deleted_at', { ascending: false })
-        .limit(5)
-
-      if (logs && logs.length > 0) {
-        console.log('🗑️ Recent cleanup operations:')
-        logs.forEach((log: any) => {
-          console.log(`  ${log.table_name}: ${log.records_deleted} records deleted at ${log.deleted_at}`)
-        })
-      }
-    })
-  })
 })

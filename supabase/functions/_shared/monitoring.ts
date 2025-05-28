@@ -1,5 +1,3 @@
-import { TestMetadata } from './test-data.ts'
-
 interface SentryConfig {
   dsn: string
   environment: string
@@ -11,15 +9,15 @@ interface PostHogConfig {
   apiHost: string
 }
 
-// Initialize monitoring services with test awareness
-export function initializeMonitoring(testMetadata?: TestMetadata | null) {
-  const isTest = !!testMetadata
+// Initialize monitoring services
+export function initializeMonitoring() {
+  const isTest = Deno.env.get('ENVIRONMENT') === 'test'
   
   // Sentry configuration
   if (Deno.env.get('SENTRY_DSN')) {
     const sentryConfig: SentryConfig = {
       dsn: Deno.env.get('SENTRY_DSN')!,
-      environment: isTest ? 'test' : (Deno.env.get('ENVIRONMENT') || 'production'),
+      environment: Deno.env.get('ENVIRONMENT') || 'production',
       release: Deno.env.get('RELEASE_VERSION')
     }
     
@@ -45,24 +43,12 @@ export function initializeMonitoring(testMetadata?: TestMetadata | null) {
   }
 }
 
-// Capture error with test awareness
-export function captureError(error: Error, context: Record<string, any> = {}, testMetadata?: TestMetadata | null) {
+// Capture error
+export function captureError(error: Error, context: Record<string, any> = {}) {
   const errorContext: Record<string, any> = {
     ...context,
     timestamp: new Date().toISOString(),
     environment: Deno.env.get('ENVIRONMENT') || 'production'
-  }
-  
-  if (testMetadata) {
-    errorContext.test = true
-    errorContext.test_run_id = testMetadata.test_run_id
-    errorContext.test_scenario = testMetadata.test_scenario
-    
-    // Don't send test errors to Sentry in production
-    if (Deno.env.get('ENVIRONMENT') === 'production') {
-      console.log('[TEST ERROR - Not sent to Sentry]:', error.message, errorContext)
-      return
-    }
   }
   
   // In production, this would send to Sentry
@@ -74,12 +60,11 @@ export function captureError(error: Error, context: Record<string, any> = {}, te
   }
 }
 
-// Track event with test awareness
+// Track event
 export function trackEvent(
   eventName: string, 
   properties: Record<string, any> = {}, 
-  userId?: string,
-  testMetadata?: TestMetadata | null
+  userId?: string
 ) {
   const eventData: {
     event: string;
@@ -94,118 +79,38 @@ export function trackEvent(
     userId: userId || 'anonymous'
   }
   
-  if (testMetadata) {
-    eventData.properties.$test = true
-    eventData.properties.$test_run_id = testMetadata.test_run_id
-    eventData.properties.$test_scenario = testMetadata.test_scenario
-    
-    // Use test user ID to avoid polluting real user analytics
-    eventData.userId = `test_${testMetadata.test_run_id}`
-    
-    // Add test prefix to event name for easy filtering
-    eventData.event = `test_${eventName}`
-  }
-  
-  // Log event (in production, this would send to PostHog)
+  // In production, this would send to PostHog
   console.log('Event tracked:', eventData)
   
   // If PostHog is configured, send the event
   if (Deno.env.get('POSTHOG_API_KEY')) {
-    // posthog.capture(eventData)
+    // posthog.capture(eventData.event, eventData.properties)
   }
 }
 
-// Track performance metrics with test awareness
-export function trackPerformance(
+// Track metric
+export function trackMetric(
   metricName: string,
   value: number,
-  unit: string = 'ms',
-  tags: Record<string, string> = {},
-  testMetadata?: TestMetadata | null
+  tags: Record<string, string> = {}
 ) {
   const metric = {
     name: metricName,
     value,
-    unit,
     tags: {
       ...tags,
       environment: Deno.env.get('ENVIRONMENT') || 'production'
-    } as Record<string, string>,
+    },
     timestamp: new Date().toISOString()
   }
   
-  if (testMetadata) {
-    metric.tags.test = 'true'
-    metric.tags.test_run_id = testMetadata.test_run_id
-    metric.name = `test.${metricName}`
-  }
+  console.log('Metric tracked:', metric)
   
-  // Log metric (in production, this would send to monitoring service)
-  console.log('Performance metric:', metric)
-  
-  // If Sentry is configured, track transaction
-  if (Deno.env.get('SENTRY_DSN')) {
-    // Sentry.trackTransaction(metric)
-  }
+  // In production, this would send to a metrics service
+  // e.g., DataDog, CloudWatch, etc.
 }
 
-// Create a monitoring context for a function execution
-export function createMonitoringContext(functionName: string, testMetadata?: TestMetadata | null) {
-  const startTime = Date.now()
-  const context = {
-    functionName,
-    startTime,
-    testMetadata
-  }
-  
-  // Initialize monitoring with test awareness
-  initializeMonitoring(testMetadata)
-  
-  return {
-    // Track function start
-    trackStart: (userId?: string) => {
-      trackEvent(`function_${functionName}_start`, {
-        function: functionName
-      }, userId, testMetadata)
-    },
-    
-    // Track function success
-    trackSuccess: (userId?: string, additionalProps?: Record<string, any>) => {
-      const duration = Date.now() - startTime
-      
-      trackEvent(`function_${functionName}_success`, {
-        function: functionName,
-        duration_ms: duration,
-        ...additionalProps
-      }, userId, testMetadata)
-      
-      trackPerformance(`function.${functionName}.duration`, duration, 'ms', {
-        status: 'success'
-      }, testMetadata)
-    },
-    
-    // Track function error
-    trackError: (error: Error, userId?: string) => {
-      const duration = Date.now() - startTime
-      
-      captureError(error, {
-        function: functionName,
-        duration_ms: duration
-      }, testMetadata)
-      
-      trackEvent(`function_${functionName}_error`, {
-        function: functionName,
-        error: error.message,
-        duration_ms: duration
-      }, userId, testMetadata)
-      
-      trackPerformance(`function.${functionName}.duration`, duration, 'ms', {
-        status: 'error'
-      }, testMetadata)
-    },
-    
-    // Get context for logging
-    getContext: () => context
-  }
+// Helper to check if monitoring is enabled
+export function isMonitoringEnabled(): boolean {
+  return !!(Deno.env.get('SENTRY_DSN') || Deno.env.get('POSTHOG_API_KEY'))
 }
-

@@ -42,9 +42,6 @@ describe('SDK Operations - Priority 1 Mobile Migration', () => {
     if (fs.existsSync(testImagePath)) {
       fs.unlinkSync(testImagePath)
     }
-    
-    // Final cleanup
-    await testDataManager.cleanupTestRun()
   })
 
   describe('Authentication Flows', () => {
@@ -214,7 +211,7 @@ describe('SDK Operations - Priority 1 Mobile Migration', () => {
       // This test doesn't depend on upload success
       const { data, error } = await supabase.storage
         .from(bucketName)
-        .list(`test-${testRunId}`, {
+        .list(`test-${Date.now()}`, {
           limit: 10,
           offset: 0
         })
@@ -324,7 +321,7 @@ describe('SDK Operations - Priority 1 Mobile Migration', () => {
           frequency: 'daily'
         },
         metadata: {
-          test_run_id: testRunId,
+          test_timestamp: Date.now(),
           test: true,
           created_at: new Date().toISOString()
         }
@@ -412,7 +409,7 @@ describe('SDK Operations - Priority 1 Mobile Migration', () => {
           .from('profiles')
           .insert({ 
             id: testUser!.id,
-            metadata: { test_run_id: testRunId }
+            metadata: { test_timestamp: Date.now() }
           })
       }
       
