@@ -4,8 +4,7 @@ import { getTestConfig } from '../config/test-env'
 const config = getTestConfig()
 
 describe('Anonymous User RLS Restrictions', () => {
-  // Skip until anonymous auth is enabled
-  describe.skip('Anonymous user access control', () => {
+  describe('Anonymous user access control', () => {
     let anonClient: any
     let anonymousUserId: string
 

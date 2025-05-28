@@ -2,9 +2,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from '@jest/glo
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import { getTestConfig, logTestConfig, TestConfig } from '../config/test-env'
 
-describe.skip('Edge Functions Remote Integration Tests', () => {
-  // TODO: Fix edge function tests - getting timeouts and auth issues
-  // Need to ensure edge functions are deployed and accessible
+describe('Edge Functions Remote Integration Tests', () => {
   let supabase: SupabaseClient
   let adminSupabase: SupabaseClient
   let config: TestConfig

@@ -46,8 +46,7 @@ describe('SDK Operations - Priority 1 Mobile Migration', () => {
 
   describe('Authentication Flows', () => {
     describe('Anonymous Authentication', () => {
-      test.skip('should create anonymous session', async () => {
-        // Anonymous authentication is enabled but migrations need to be applied first
+      test('should create anonymous session', async () => {
         const { data, error } = await supabase.auth.signInAnonymously()
         
         expect(error).toBeNull()
@@ -61,8 +60,7 @@ describe('SDK Operations - Priority 1 Mobile Migration', () => {
         testUser = data.user
       })
       
-      test.skip('should get current anonymous user', async () => {
-        // Skipped: depends on anonymous session creation
+      test('should get current anonymous user', async () => {
         const { data: { user }, error } = await supabase.auth.getUser()
         
         expect(error).toBeNull()
@@ -70,8 +68,7 @@ describe('SDK Operations - Priority 1 Mobile Migration', () => {
         expect(user?.id).toBe(testUser?.id)
       })
       
-      test.skip('should sign out anonymous user', async () => {
-        // Skipped: depends on anonymous session creation
+      test('should sign out anonymous user', async () => {
         const { error } = await supabase.auth.signOut()
         
         expect(error).toBeNull()
@@ -293,9 +290,7 @@ describe('SDK Operations - Priority 1 Mobile Migration', () => {
     })
   })
 
-  describe.skip('User Profile CRUD Operations', () => {
-    // TODO: Fix profile constraint issues - getting "user_profiles_sex_check" error
-    // Need to investigate database constraints and ensure test data matches
+  describe('User Profile CRUD Operations', () => {
     beforeEach(async () => {
       // Ensure authenticated
       const { data, error } = await supabase.auth.signInWithPassword({
