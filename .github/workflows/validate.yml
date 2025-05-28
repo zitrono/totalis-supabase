@@ -84,6 +84,11 @@ jobs:
             if [ -d "$function_dir" ]; then
               function_name=$(basename "$function_dir")
               
+              # Skip _shared directory
+              if [ "$function_name" = "_shared" ]; then
+                continue
+              fi
+              
               # Check for index.ts
               if [ ! -f "$function_dir/index.ts" ]; then
                 echo "❌ Missing index.ts in function: $function_name"
@@ -100,6 +105,12 @@ jobs:
           for function_dir in supabase/functions/*/; do
             if [ -d "$function_dir" ] && [ -f "$function_dir/index.ts" ]; then
               function_name=$(basename "$function_dir")
+              
+              # Skip _shared directory
+              if [ "$function_name" = "_shared" ]; then
+                continue
+              fi
+              
               echo "Type checking function: $function_name"
               
               cd "$function_dir"
@@ -115,6 +126,11 @@ jobs:
           for function_dir in supabase/functions/*/; do
             if [ -d "$function_dir" ] && [ -f "$function_dir/index.ts" ]; then
               function_name=$(basename "$function_dir")
+              
+              # Skip _shared directory
+              if [ "$function_name" = "_shared" ]; then
+                continue
+              fi
               
               # Check if function uses env vars and validates them
               if grep -q "Deno.env.get" "$function_dir/index.ts"; then
