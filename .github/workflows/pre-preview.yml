@@ -71,8 +71,9 @@ jobs:
         run: |
           echo "🔍 Type checking Edge Functions..."
           
-          # Check each function in parallel for speed
-          errors=0
+          # Check each function individually to get proper error reporting
+          failed_functions=""
+          
           for function_dir in supabase/functions/*/; do
             if [ -d "$function_dir" ] && [ -f "$function_dir/index.ts" ]; then
               function_name=$(basename "$function_dir")
@@ -84,23 +85,22 @@ jobs:
               
               echo "Checking $function_name..."
               
-              # Run deno check in background
-              (cd "$function_dir" && deno check --no-lock index.ts) &
+              # Run deno check and capture result
+              if ! (cd "$function_dir" && deno check --no-lock index.ts 2>&1); then
+                failed_functions="$failed_functions $function_name"
+                echo "❌ Failed: $function_name"
+              else
+                echo "✅ Passed: $function_name"
+              fi
             fi
           done
           
-          # Wait for all background jobs
-          wait
-          
-          # Check if any failed
-          for job in $(jobs -p); do
-            if ! wait $job; then
-              errors=$((errors + 1))
-            fi
-          done
-          
-          if [ $errors -gt 0 ]; then
-            echo "❌ TypeScript validation failed for $errors function(s)"
+          if [ -n "$failed_functions" ]; then
+            echo ""
+            echo "❌ TypeScript validation failed for:$failed_functions"
+            echo ""
+            echo "Run locally to see detailed errors:"
+            echo "cd supabase/functions/FUNCTION_NAME && deno check index.ts"
             exit 1
           fi
           
@@ -152,12 +152,7 @@ jobs:
                 exit 1
               fi
               
-              # Check for required type references
-              if ! head -3 "$function_dir/index.ts" | grep -q "reference lib=\"deno.ns\""; then
-                echo "❌ Missing Deno type reference in: $function_name"
-                echo "Add: /// <reference lib=\"deno.ns\" /> at the top"
-                exit 1
-              fi
+              # Type references are checked by deno check, no need to duplicate
             fi
           done
           
@@ -170,7 +165,7 @@ jobs:
           echo "✅ All static validations passed!"
           echo "validation_passed=true" >> $GITHUB_OUTPUT
           
-          # Create a comment on the PR
+          # Try to create a comment on the PR (optional, don't fail if it can't)
           gh pr comment ${{ github.event.pull_request.number }} \
             --body "✅ **Pre-preview validation passed!**
             
@@ -189,7 +184,7 @@ jobs:
             Or use the GitHub CLI:
             \`\`\`bash
             gh workflow run preview.yml -f pr_number=${{ github.event.pull_request.number }}
-            \`\`\`"
+            \`\`\`" || echo "Note: Could not post PR comment (insufficient permissions)"
         env:
           GH_TOKEN: ${{ github.token }}
 
@@ -204,6 +199,6 @@ jobs:
             
             Please fix the validation errors above before a preview environment can be created.
             
-            Once fixed, push your changes and validation will run again automatically."
+            Once fixed, push your changes and validation will run again automatically." || echo "Note: Could not post PR comment (insufficient permissions)"
         env:
           GH_TOKEN: ${{ github.token }}
