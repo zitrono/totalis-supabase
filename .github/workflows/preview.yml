@@ -23,6 +23,8 @@ jobs:
 
       - name: Setup Supabase CLI
         run: |
+          mkdir -p /tmp/supabase-cli
+          cd /tmp/supabase-cli
           wget -qO- https://github.com/supabase/cli/releases/download/v${SUPABASE_CLI_VERSION}/supabase_linux_amd64.tar.gz | tar xvz
           sudo mv supabase /usr/local/bin/
           supabase --version
