@@ -163,10 +163,11 @@ serve(async (req) => {
     )
 
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error)
     console.error('Text-to-speech error:', error)
     
     const response: TTSResponse = {
-      error: error.message || 'TTS generation failed',
+      error: errorMessage || 'TTS generation failed',
     }
     
     return new Response(

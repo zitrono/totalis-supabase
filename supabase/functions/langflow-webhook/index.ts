@@ -42,11 +42,12 @@ serve(async (req) => {
       }
     )
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error)
     console.error('Langflow webhook error:', error)
     
     return new Response(
       JSON.stringify({ 
-        error: error.message,
+        error: errorMessage,
         timestamp: new Date().toISOString()
       }),
       { 
