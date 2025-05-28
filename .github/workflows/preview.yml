@@ -34,25 +34,10 @@ jobs:
           supabase login --token ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           supabase link --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
 
-      - name: Create preview branch
+      - name: Run migrations
         run: |
-          BRANCH_NAME="preview-pr-${{ github.event.pull_request.number }}"
-          echo "Creating preview branch: $BRANCH_NAME"
-          
-          # Check if branch already exists
-          if supabase branches list --project-ref ${{ secrets.SUPABASE_PROJECT_REF }} | grep -q "$BRANCH_NAME"; then
-            echo "Preview branch already exists, deleting and recreating..."
-            supabase branches delete "$BRANCH_NAME" --project-ref ${{ secrets.SUPABASE_PROJECT_REF }} || true
-          fi
-          
-          # Create new preview branch
-          supabase branches create "$BRANCH_NAME" --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
-
-      - name: Run migrations on preview branch
-        run: |
-          BRANCH_NAME="preview-pr-${{ github.event.pull_request.number }}"
-          # Switch to preview branch and run migrations
-          supabase branches switch "$BRANCH_NAME" --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+          # For now, skip preview branches until properly configured
+          echo "Running migrations on main project (preview branches coming soon)..."
           supabase db push --password ${{ secrets.SUPABASE_DB_PASSWORD }}
 
       - name: Seed preview database

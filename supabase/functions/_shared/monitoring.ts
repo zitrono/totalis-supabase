@@ -1,3 +1,5 @@
+/// <reference lib="deno.ns" />
+
 import { TestMetadata } from './test-data.ts'
 
 interface SentryConfig {
