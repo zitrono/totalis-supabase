@@ -56,9 +56,8 @@ describe('SDK Operations - Priority 1 Mobile Migration', () => {
 
   describe('Authentication Flows', () => {
     describe('Anonymous Authentication', () => {
-      test.skip('should create anonymous session', async () => {
-        // TODO: Fix anonymous authentication - currently failing with "Database error creating anonymous user"
-        // This needs to be enabled in Supabase dashboard under Authentication > Providers
+      test('should create anonymous session', async () => {
+        // Anonymous authentication is now enabled in Supabase dashboard
         const { data, error } = await supabase.auth.signInAnonymously()
         
         expect(error).toBeNull()
