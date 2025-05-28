@@ -7,7 +7,7 @@ import { corsHeaders } from '../_shared/cors.ts'
 import { getUserContext } from '../_shared/supabase-client.ts'
 import { LangflowClient } from '../_shared/langflow-client.ts'
 import { ChatMessage } from '../_shared/types.ts'
-import { extractTestMetadata, mergeTestMetadata } from '../_shared/test-data.ts'
+import { getTestMetadata, mergeTestMetadata } from '../_shared/test-data.ts'
 
 const langflowClient = new LangflowClient()
 

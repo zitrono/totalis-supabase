@@ -3,7 +3,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { corsHeaders } from "../_shared/cors.ts"
-import { extractTestMetadata, mergeTestMetadata } from "../_shared/test-data.ts"
+import { getTestMetadata, mergeTestMetadata } from "../_shared/test-data.ts"
 
 serve(async (req) => {
   // Handle CORS
@@ -13,7 +13,7 @@ serve(async (req) => {
 
   try {
     const { count = 3 } = await req.json()
-    const testMetadata = extractTestMetadata(req)
+    const testMetadata = getTestMetadata(req)
     
     // Mock recommendations without auth
     const mockRecommendations = [

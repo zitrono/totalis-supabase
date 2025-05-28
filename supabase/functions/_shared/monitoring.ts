@@ -114,3 +114,13 @@ export function trackMetric(
 export function isMonitoringEnabled(): boolean {
   return !!(Deno.env.get('SENTRY_DSN') || Deno.env.get('POSTHOG_API_KEY'))
 }
+
+// Create monitoring context for a request
+export function createMonitoringContext(req: Request) {
+  return {
+    method: req.method,
+    url: req.url,
+    headers: Object.fromEntries(req.headers.entries()),
+    timestamp: new Date().toISOString()
+  }
+}

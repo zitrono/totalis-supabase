@@ -5,7 +5,7 @@ import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
 import { corsHeaders } from '../_shared/cors.ts'
 import { createMonitoringContext } from '../_shared/monitoring.ts'
-import { extractTestMetadata } from '../_shared/test-data.ts'
+import { getTestMetadata } from '../_shared/test-data.ts'
 
 const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY')
 const MAX_FILE_SIZE = 25 * 1024 * 1024 // 25MB limit per OpenAI
@@ -17,7 +17,7 @@ serve(async (req) => {
   }
 
   // Extract test metadata
-  const testMetadata = extractTestMetadata(req)
+  const testMetadata = getTestMetadata(req)
   const monitoring = createMonitoringContext('audio-transcribe', testMetadata)
   
   try {
