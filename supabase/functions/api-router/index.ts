@@ -1,3 +1,6 @@
+/// <reference lib="deno.ns" />
+/// <reference lib="dom" />
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
 import { corsHeaders } from "../_shared/cors.ts"
@@ -113,10 +116,11 @@ serve(async (req) => {
     const { data, error } = await supabase.rpc(rpcFunctionName, rpcParams)
 
     if (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error)
       console.error('RPC error:', error)
       
       // If function doesn't exist, return 404
-      if (error.message.includes('not exist')) {
+      if (errorMessage.includes('not exist')) {
         return new Response(
           JSON.stringify({ error: `Endpoint not found: ${pathname}` }),
           { 
@@ -128,7 +132,7 @@ serve(async (req) => {
       
       // Other errors
       return new Response(
-        JSON.stringify({ error: error.message }),
+        JSON.stringify({ error: errorMessage }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 500
@@ -146,10 +150,11 @@ serve(async (req) => {
     )
 
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error)
     console.error('API Router error:', error)
     
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: errorMessage }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500

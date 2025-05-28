@@ -47,7 +47,7 @@ export function initializeMonitoring(testMetadata?: TestMetadata | null) {
 
 // Capture error with test awareness
 export function captureError(error: Error, context: Record<string, any> = {}, testMetadata?: TestMetadata | null) {
-  const errorContext = {
+  const errorContext: Record<string, any> = {
     ...context,
     timestamp: new Date().toISOString(),
     environment: Deno.env.get('ENVIRONMENT') || 'production'
@@ -81,7 +81,11 @@ export function trackEvent(
   userId?: string,
   testMetadata?: TestMetadata | null
 ) {
-  const eventData = {
+  const eventData: {
+    event: string;
+    properties: Record<string, any>;
+    userId: string;
+  } = {
     event: eventName,
     properties: {
       ...properties,
@@ -126,7 +130,7 @@ export function trackPerformance(
     tags: {
       ...tags,
       environment: Deno.env.get('ENVIRONMENT') || 'production'
-    },
+    } as Record<string, string>,
     timestamp: new Date().toISOString()
   }
   
@@ -204,3 +208,4 @@ export function createMonitoringContext(functionName: string, testMetadata?: Tes
     getContext: () => context
   }
 }
+

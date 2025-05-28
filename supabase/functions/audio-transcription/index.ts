@@ -1,3 +1,6 @@
+/// <reference lib="deno.ns" />
+/// <reference lib="dom" />
+
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0'
 import { corsHeaders } from '../_shared/cors.ts'
@@ -221,10 +224,11 @@ serve(async (req) => {
                 language: result.language,
               }
             } catch (error) {
+              const errorMessage = error instanceof Error ? error.message : 'Transcription failed'
               return {
                 id: item.id,
                 text: '',
-                error: error.message || 'Transcription failed',
+                error: errorMessage,
               }
             }
           })
@@ -291,11 +295,12 @@ serve(async (req) => {
     )
 
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Transcription failed'
     console.error('Audio transcription error:', error)
     
     const response: TranscriptionResponse = {
       text: '',
-      error: error.message || 'Transcription failed',
+      error: errorMessage,
     }
     
     return new Response(

@@ -1,23 +1,26 @@
+/// <reference lib="deno.ns" />
+/// <reference lib="dom" />
+
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
 import { corsHeaders } from '../_shared/cors.ts'
-import { monitoringManager } from '../_shared/monitoring.ts'
+import { createMonitoringContext } from '../_shared/monitoring.ts'
+import { extractTestMetadata } from '../_shared/test-data.ts'
 
 const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY')
 const MAX_FILE_SIZE = 25 * 1024 * 1024 // 25MB limit per OpenAI
 
 serve(async (req) => {
-  const startTime = Date.now()
-  const functionName = 'audio-transcribe'
-
   // Handle CORS
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
+  // Extract test metadata
+  const testMetadata = extractTestMetadata(req)
+  const monitoring = createMonitoringContext('audio-transcribe', testMetadata)
+  
   try {
-    // Increment invocation counter
-    await monitoringManager.incrementInvocation(functionName)
 
     // Get auth header
     const authHeader = req.headers.get('Authorization')
@@ -114,9 +117,8 @@ serve(async (req) => {
       throw new Error(`Failed to save transcription: ${dbError.message}`)
     }
 
-    // Record success metrics
-    await monitoringManager.recordDuration(functionName, Date.now() - startTime)
-    await monitoringManager.incrementSuccess(functionName)
+    // Track success
+    monitoring.trackSuccess(user.id, { transcriptionLength: transcription.text.length })
 
     return new Response(
       JSON.stringify({
@@ -133,15 +135,15 @@ serve(async (req) => {
     )
 
   } catch (error) {
-    // Record error metrics
-    await monitoringManager.recordDuration(functionName, Date.now() - startTime)
-    await monitoringManager.incrementError(functionName, error.message)
+    // Track error
+    monitoring.trackError(error instanceof Error ? error : new Error(String(error)))
 
+    const errorMessage = error instanceof Error ? error.message : String(error)
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: errorMessage }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: error.message.includes('authentication') ? 401 : 400
+        status: errorMessage.includes('authentication') ? 401 : 400
       }
     )
   }
