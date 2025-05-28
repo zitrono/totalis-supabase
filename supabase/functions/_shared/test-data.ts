@@ -58,3 +58,23 @@ export function isTestEnvironment(): boolean {
   return Deno.env.get('ENVIRONMENT') === 'test' || 
          Deno.env.get('IS_TEST') === 'true'
 }
+
+/**
+ * Merges test metadata into an object
+ */
+export function mergeTestMetadata<T extends Record<string, any>>(
+  data: T, 
+  testMetadata?: TestMetadata
+): T {
+  if (!testMetadata) {
+    return data
+  }
+  
+  return {
+    ...data,
+    metadata: {
+      ...data.metadata,
+      ...testMetadata
+    }
+  }
+}

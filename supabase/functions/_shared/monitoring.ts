@@ -121,6 +121,13 @@ export function createMonitoringContext(functionName: string, metadata?: any) {
     functionName,
     metadata,
     timestamp: new Date().toISOString(),
+    trackStart: (userId?: string, data?: any) => {
+      trackEvent(`${functionName}.start`, { 
+        userId, 
+        ...data, 
+        ...metadata 
+      })
+    },
     trackSuccess: (userIdOrData?: any, additionalData?: any) => {
       // Handle both trackSuccess(data) and trackSuccess(userId, data) patterns
       let eventData: any = {}
