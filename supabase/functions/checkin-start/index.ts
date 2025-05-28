@@ -144,7 +144,7 @@ serve(async (req) => {
     )
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error)
-    monitoring.trackError(error as Error, user?.id)
+    monitoring.trackError(error instanceof Error ? error : new Error(String(error)))
     console.error('Check-in start error:', error)
     
     return new Response(
