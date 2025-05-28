@@ -41,3 +41,6 @@ supabase/.branches/
 # Migration backups
 *.sql.backup
 totalis_*.sql
+
+# GitHub Secrets
+.env.github-secrets
