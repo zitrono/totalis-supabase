@@ -48,24 +48,20 @@ describe('Database Views', () => {
     
     testUserId = authData.user!.id
     
-    // Delete existing profile to ensure clean state
-    await supabase
-      .from('profiles')
-      .delete()
-      .eq('id', testUserId)
-    
-    // Create profile with coach
+    // Upsert profile with coach (handles existing profiles)
     const { error: profileError } = await supabase
       .from('profiles')
-      .insert({
+      .upsert({
         id: testUserId,
         name: 'Test User',
         coach_id: testCoachId,
         metadata: { test: true, test_run: Date.now() }
       })
+      .select()
+      .single()
     
     if (profileError) {
-      console.error('Error creating profile:', profileError)
+      console.error('Error upserting profile:', profileError)
       throw profileError
     }
   })

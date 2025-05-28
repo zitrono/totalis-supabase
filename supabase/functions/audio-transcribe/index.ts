@@ -74,7 +74,7 @@ serve(async (req) => {
     // Upload to Supabase Storage
     const arrayBuffer = await audioFile.arrayBuffer()
     const { error: uploadError } = await supabase.storage
-      .from('voice-recordings')
+      .from('voice-messages')
       .upload(filename, arrayBuffer, {
         contentType: audioFile.type,
         upsert: false
@@ -113,7 +113,7 @@ serve(async (req) => {
 
     if (dbError) {
       // Try to clean up uploaded file
-      await supabase.storage.from('voice-recordings').remove([filename])
+      await supabase.storage.from('voice-messages').remove([filename])
       throw new Error(`Failed to save transcription: ${dbError.message}`)
     }
 
