@@ -202,14 +202,5 @@ jobs:
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           ENVIRONMENT: test
-          TEST_CLEANUP_STRATEGY: immediate
           NODE_ENV: test
 
-      - name: Clean up test data
-        if: always()
-        run: npm run test:cleanup -- --older-than "0 minutes"
-        continue-on-error: true
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          ENVIRONMENT: test
