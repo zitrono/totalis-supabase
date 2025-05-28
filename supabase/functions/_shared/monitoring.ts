@@ -121,8 +121,16 @@ export function createMonitoringContext(functionName: string, metadata?: any) {
     functionName,
     metadata,
     timestamp: new Date().toISOString(),
-    trackSuccess: (data?: any) => {
-      trackEvent(`${functionName}.success`, { ...data, ...metadata })
+    trackSuccess: (userIdOrData?: any, additionalData?: any) => {
+      // Handle both trackSuccess(data) and trackSuccess(userId, data) patterns
+      let eventData: any = {}
+      if (typeof userIdOrData === 'string') {
+        eventData.userId = userIdOrData
+        eventData = { ...eventData, ...additionalData }
+      } else {
+        eventData = userIdOrData || {}
+      }
+      trackEvent(`${functionName}.success`, { ...eventData, ...metadata })
     },
     trackError: (error: Error | string) => {
       const err = error instanceof Error ? error : new Error(String(error))
