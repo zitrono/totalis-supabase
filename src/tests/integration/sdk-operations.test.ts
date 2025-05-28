@@ -324,7 +324,7 @@ describe('SDK Operations - Priority 1 Mobile Migration', () => {
       
       const { data, error } = await supabase
         .from('profiles')
-        .insert(profileData)
+        .upsert(profileData)
         .select()
         .single()
       
