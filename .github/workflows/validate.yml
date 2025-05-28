@@ -52,8 +52,8 @@ jobs:
               echo "Checking SQL syntax in: $(basename "$file")"
               
               # Check for common SQL syntax errors
-              if grep -E ";;|^[[:space:]]*$" "$file"; then
-                echo "❌ Found potential SQL syntax error in: $file"
+              if grep -E ";;" "$file"; then
+                echo "❌ Found double semicolon in: $file"
                 exit 1
               fi
               
