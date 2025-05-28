@@ -1,4 +1,4 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
+import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
 
 export interface TestMetadata {
   test: boolean
@@ -43,7 +43,7 @@ export function mergeTestMetadata(
 }
 
 export async function markRecordAsTest(
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseClient,
   tableName: string,
   recordId: string,
   testMetadata: TestMetadata | null

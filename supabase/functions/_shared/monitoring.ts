@@ -211,7 +211,19 @@ export function createMonitoringContext(functionName: string, testMetadata?: Tes
   }
 }
 
-// Export singleton instance
+// Export singleton instance with commonly used methods
 export const monitoringManager = {
-  initialize: (name: string, metadata?: TestMetadata | null) => initialize(name, metadata)
+  initialize,
+  trackEvent,
+  trackPerformance,
+  captureError,
+  recordDuration: (functionName: string, duration: number) => {
+    trackPerformance(`function.${functionName}.duration`, duration, 'ms')
+  },
+  incrementError: (functionName: string, errorMessage: string) => {
+    trackEvent(`function_${functionName}_error`, {
+      function: functionName,
+      error: errorMessage
+    })
+  }
 }
