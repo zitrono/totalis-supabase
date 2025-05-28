@@ -1,0 +1,209 @@
+name: Pre-Preview Validation
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'supabase/**'
+      - 'src/**'
+      - '.github/workflows/**'
+
+jobs:
+  static-validation:
+    runs-on: ubuntu-latest
+    name: Fast Static Validation
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v1
+        with:
+          deno-version: v1.37.0
+
+      - name: Validate Migration Naming
+        run: |
+          echo "🔍 Checking migration naming convention..."
+          
+          for file in supabase/migrations/*.sql; do
+            if [ -f "$file" ]; then
+              filename=$(basename "$file")
+              # Check format: YYYYMMDDHHMMSS_prefix_description.sql
+              if ! [[ "$filename" =~ ^[0-9]{14}_(feat|fix|refactor|hf)_[a-z0-9_]+\.sql$ ]]; then
+                echo "❌ Invalid migration name: $filename"
+                echo "Expected format: YYYYMMDDHHMMSS_prefix_description.sql"
+                echo "Valid prefixes: feat_, fix_, refactor_, hf_"
+                exit 1
+              fi
+            fi
+          done
+          echo "✅ All migrations follow naming convention"
+
+      - name: Quick SQL Syntax Check
+        run: |
+          echo "🔍 Checking SQL syntax..."
+          
+          for file in supabase/migrations/*.sql; do
+            if [ -f "$file" ]; then
+              filename=$(basename "$file")
+              
+              # Check for common SQL errors
+              if grep -E ";;" "$file"; then
+                echo "❌ Double semicolon found in: $filename"
+                exit 1
+              fi
+              
+              if grep -E "^\s*--[^-]" "$file" | grep -v "^\s*--\s"; then
+                echo "❌ Invalid comment format in: $filename (use -- with space)"
+                exit 1
+              fi
+              
+              # Check for required safety patterns
+              if ! grep -qE "(IF NOT EXISTS|IF EXISTS|OR REPLACE)" "$file"; then
+                echo "⚠️  Warning: Migration may not be idempotent: $filename"
+              fi
+            fi
+          done
+          echo "✅ SQL syntax validation passed"
+
+      - name: TypeScript Type Check
+        run: |
+          echo "🔍 Type checking Edge Functions..."
+          
+          # Check each function in parallel for speed
+          errors=0
+          for function_dir in supabase/functions/*/; do
+            if [ -d "$function_dir" ] && [ -f "$function_dir/index.ts" ]; then
+              function_name=$(basename "$function_dir")
+              
+              # Skip _shared directory
+              if [ "$function_name" = "_shared" ]; then
+                continue
+              fi
+              
+              echo "Checking $function_name..."
+              
+              # Run deno check in background
+              (cd "$function_dir" && deno check --no-lock index.ts) &
+            fi
+          done
+          
+          # Wait for all background jobs
+          wait
+          
+          # Check if any failed
+          for job in $(jobs -p); do
+            if ! wait $job; then
+              errors=$((errors + 1))
+            fi
+          done
+          
+          if [ $errors -gt 0 ]; then
+            echo "❌ TypeScript validation failed for $errors function(s)"
+            exit 1
+          fi
+          
+          echo "✅ All functions pass type checking"
+
+      - name: Check for Hardcoded Secrets
+        run: |
+          echo "🔍 Scanning for hardcoded secrets..."
+          
+          # Patterns that indicate hardcoded secrets
+          patterns=(
+            "SUPABASE_SERVICE_ROLE_KEY\s*=\s*['\"][^'\"]+['\"]"
+            "SUPABASE_ANON_KEY\s*=\s*['\"][^'\"]+['\"]"
+            "OPENAI_API_KEY\s*=\s*['\"][^'\"]+['\"]"
+            "sk-[a-zA-Z0-9]{48}"
+            "eyJ[a-zA-Z0-9_-]{20,}"
+          )
+          
+          found_secrets=false
+          for pattern in "${patterns[@]}"; do
+            if grep -rE "$pattern" supabase/functions --include="*.ts" --include="*.js"; then
+              found_secrets=true
+            fi
+          done
+          
+          if [ "$found_secrets" = true ]; then
+            echo "❌ Found hardcoded secrets! Use Deno.env.get() instead"
+            exit 1
+          fi
+          
+          echo "✅ No hardcoded secrets found"
+
+      - name: Validate Required Files
+        run: |
+          echo "🔍 Checking required files..."
+          
+          # Check each function has required structure
+          for function_dir in supabase/functions/*/; do
+            if [ -d "$function_dir" ]; then
+              function_name=$(basename "$function_dir")
+              
+              # Skip _shared directory
+              if [ "$function_name" = "_shared" ]; then
+                continue
+              fi
+              
+              if [ ! -f "$function_dir/index.ts" ]; then
+                echo "❌ Missing index.ts in: $function_name"
+                exit 1
+              fi
+              
+              # Check for required type references
+              if ! head -3 "$function_dir/index.ts" | grep -q "reference lib=\"deno.ns\""; then
+                echo "❌ Missing Deno type reference in: $function_name"
+                echo "Add: /// <reference lib=\"deno.ns\" /> at the top"
+                exit 1
+              fi
+            fi
+          done
+          
+          echo "✅ All required files present"
+
+      - name: Set Validation Result
+        id: validation
+        if: success()
+        run: |
+          echo "✅ All static validations passed!"
+          echo "validation_passed=true" >> $GITHUB_OUTPUT
+          
+          # Create a comment on the PR
+          gh pr comment ${{ github.event.pull_request.number }} \
+            --body "✅ **Pre-preview validation passed!**
+            
+            All static checks completed successfully:
+            - ✓ Migration naming convention
+            - ✓ SQL syntax validation
+            - ✓ TypeScript type checking
+            - ✓ No hardcoded secrets
+            - ✓ Required files present
+            
+            You can now manually trigger the preview environment deployment by:
+            1. Going to the [Actions tab](https://github.com/${{ github.repository }}/actions)
+            2. Select 'Deploy Preview Environment'
+            3. Click 'Run workflow' and select this PR
+            
+            Or use the GitHub CLI:
+            \`\`\`bash
+            gh workflow run preview.yml -f pr_number=${{ github.event.pull_request.number }}
+            \`\`\`"
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Set Validation Failure
+        if: failure()
+        run: |
+          echo "❌ Static validation failed"
+          echo "validation_passed=false" >> $GITHUB_OUTPUT
+          
+          gh pr comment ${{ github.event.pull_request.number }} \
+            --body "❌ **Pre-preview validation failed!**
+            
+            Please fix the validation errors above before a preview environment can be created.
+            
+            Once fixed, push your changes and validation will run again automatically."
+        env:
+          GH_TOKEN: ${{ github.token }}

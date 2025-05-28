@@ -5,6 +5,7 @@ on:
     paths:
       - 'supabase/**'
       - '.github/workflows/validate.yml'
+  workflow_call:  # Allow this workflow to be called by others
 
 env:
   SUPABASE_CLI_VERSION: 2.23.4
