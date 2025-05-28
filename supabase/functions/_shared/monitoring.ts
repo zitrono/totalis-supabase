@@ -132,7 +132,7 @@ export function trackPerformance(
     tags: {
       ...tags,
       environment: Deno.env.get('ENVIRONMENT') || 'production'
-    },
+    } as Record<string, string>,
     timestamp: new Date().toISOString()
   }
   
@@ -209,4 +209,9 @@ export function createMonitoringContext(functionName: string, testMetadata?: Tes
     // Get context for logging
     getContext: () => context
   }
+}
+
+// Export singleton instance
+export const monitoringManager = {
+  initialize: (name: string, metadata?: TestMetadata | null) => initialize(name, metadata)
 }

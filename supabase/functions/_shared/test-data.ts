@@ -52,7 +52,7 @@ export async function markRecordAsTest(
   
   const { error } = await supabase
     .from(tableName)
-    .update({ metadata: testMetadata })
+    .update({ metadata: testMetadata } as any)
     .eq('id', recordId)
   
   if (error) {
