@@ -1,5 +1,3 @@
-/// <reference lib="deno.ns" />
-
 import { TestMetadata } from './test-data.ts'
 
 interface SentryConfig {
@@ -211,32 +209,3 @@ export function createMonitoringContext(functionName: string, testMetadata?: Tes
   }
 }
 
-// Export singleton instance with commonly used methods
-export const monitoringManager = {
-  initialize: (name: string, metadata?: TestMetadata | null) => initialize(name, metadata),
-  trackEvent: (eventName: string, properties?: Record<string, any>, userId?: string, testMetadata?: TestMetadata | null) => 
-    trackEvent(eventName, properties, userId, testMetadata),
-  trackPerformance: (metricName: string, value: number, unit: string = 'ms', tags: Record<string, string> = {}, testMetadata?: TestMetadata | null) =>
-    trackPerformance(metricName, value, unit, tags, testMetadata),
-  captureError: (error: Error, context?: Record<string, any>, testMetadata?: TestMetadata | null) =>
-    captureError(error, context, testMetadata),
-  recordDuration: (functionName: string, duration: number) => {
-    trackPerformance(`function.${functionName}.duration`, duration, 'ms')
-  },
-  incrementError: (functionName: string, errorMessage: string) => {
-    trackEvent(`function_${functionName}_error`, {
-      function: functionName,
-      error: errorMessage
-    })
-  },
-  incrementInvocation: (functionName: string) => {
-    trackEvent(`function_${functionName}_invoked`, {
-      function: functionName
-    })
-  },
-  incrementSuccess: (functionName: string) => {
-    trackEvent(`function_${functionName}_success`, {
-      function: functionName
-    })
-  }
-}
