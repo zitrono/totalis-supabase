@@ -161,7 +161,8 @@ export class TestDataManager {
   getTestHeaders(): Record<string, string> {
     return {
       'X-Test-Run-Id': this.config.testRunId,
-      'X-Test-Scenario': 'integration-test'
+      'X-Test-Scenario': 'integration-test',
+      'Authorization': `Bearer ${this.config.supabaseAnonKey}`
     }
   }
 
