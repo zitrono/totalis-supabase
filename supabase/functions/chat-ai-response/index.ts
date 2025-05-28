@@ -61,8 +61,12 @@ serve(async (req) => {
       message, 
       contextType, 
       contextId,
-      includeHistory = true 
+      includeHistory = true,
+      conversationId = crypto.randomUUID()
     } = await req.json()
+    
+    // Get test metadata
+    const testMetadata = getTestMetadata(req)
     
     if (!message) {
       return new Response(
@@ -88,10 +92,10 @@ serve(async (req) => {
         id: m.id,
         userId: m.user_id,
         message: m.content,
-        isUser: m.is_user,
+        isUser: m.role === 'user',
         timestamp: m.created_at,
-        contextType: m.context_type,
-        contextId: m.context_id
+        contextType: m.metadata?.context_type,
+        contextId: m.metadata?.context_id
       })).reverse() || []
     }
 
@@ -101,9 +105,13 @@ serve(async (req) => {
       .insert({
         user_id: user.id,
         content: message,
-        is_user: true,
-        context_type: contextType,
-        context_id: contextId,
+        role: 'user',
+        category_id: contextType === 'category' ? contextId : null,
+        conversation_id: conversationId,
+        metadata: mergeTestMetadata({
+          context_type: contextType,
+          context_id: contextId
+        }, testMetadata),
         created_at: new Date().toISOString()
       })
       .select()
@@ -129,9 +137,14 @@ serve(async (req) => {
       .insert({
         user_id: user.id,
         content: aiResponse,
-        is_user: false,
-        context_type: contextType,
-        context_id: contextId,
+        role: 'assistant',
+        category_id: contextType === 'category' ? contextId : null,
+        conversation_id: conversationId,
+        coach_id: context.coachId,
+        metadata: mergeTestMetadata({
+          context_type: contextType,
+          context_id: contextId
+        }, testMetadata),
         created_at: new Date().toISOString()
       })
       .select()
@@ -151,13 +164,13 @@ serve(async (req) => {
     // Return response
     return new Response(
       JSON.stringify({
-        userMessage: userMessage || { content: message, is_user: true },
-        aiMessage: aiMessage || { content: aiResponse, is_user: false },
+        response: aiResponse,
+        conversationId: conversationId,
+        userMessage: userMessage,
+        aiMessage: aiMessage,
         coach: coach,
-        context: {
-          type: contextType,
-          id: contextId
-        }
+        contextUsed: contextType,
+        metadata: testMetadata
       }),
       { 
         headers: { 

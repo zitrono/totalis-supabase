@@ -254,8 +254,7 @@ describe('Edge Functions Remote Integration Tests', () => {
       expect(response.status).toBe(401)
     })
 
-    it.skip('should transcribe audio file with auth', async () => {
-      // Skip - edge function has storage/RLS issues
+    it('should transcribe audio file with auth', async () => {
       // Create a small test audio file (1 second of silence)
       const audioBuffer = new Uint8Array(44100) // 1 second at 44.1kHz
       const blob = new Blob([audioBuffer], { type: 'audio/wav' })
@@ -279,9 +278,13 @@ describe('Edge Functions Remote Integration Tests', () => {
         console.log('Audio transcribe function returned server error, likely deployment issue')
         expect(response.status).toBeGreaterThanOrEqual(500)
       } else if (response.status === 400) {
-        // Function might reject our test audio file
+        // Function might reject our test audio file or have old version
         console.log('Audio transcribe rejected test file:', data.error)
         expect(data.error).toBeDefined()
+        // If it's the old version trying to upload, skip assertions
+        if (data.error.includes('Bucket not found')) {
+          console.log('Edge function using old version with storage - needs deployment')
+        }
       } else {
         expect(response.status).toBe(200)
         expect(data.transcription).toBeDefined()
@@ -346,7 +349,7 @@ describe('Edge Functions Remote Integration Tests', () => {
     })
 
     it.skip('should generate AI response with context', async () => {
-      // Skip - edge function deployment issues
+      // Skip - edge function needs deployment with new message schema
       const response = await fetch(`${config.supabaseUrl}/functions/v1/chat-ai-response`, {
         method: 'POST',
         headers: {
@@ -362,6 +365,9 @@ describe('Edge Functions Remote Integration Tests', () => {
 
       // Check if function is working or having deployment issues
       const data = await response.json() as any
+      
+      console.log('Chat AI response status:', response.status)
+      console.log('Chat AI response data:', JSON.stringify(data, null, 2))
       
       if (response.status >= 500) {
         console.log('Chat AI response function error:', data.error || 'Server error')
@@ -390,7 +396,7 @@ describe('Edge Functions Remote Integration Tests', () => {
     })
 
     it.skip('should handle chat with specific context', async () => {
-      // Skip - edge function deployment issues
+      // Skip - edge function needs deployment with new message schema
       // Get a valid category ID first
       const { data: categories } = await adminSupabase
         .from('categories')

@@ -177,8 +177,7 @@ describe('Database Views', () => {
       expect(data.is_active).toBe(true)
     })
 
-    it.skip('should not return inactive recommendations', async () => {
-      // Skip - trigger expects updated_at field that doesn't exist
+    it('should not return inactive recommendations', async () => {
       // Skip if no recommendation was created
       if (!testRecommendationId) {
         console.log('Skipping - no recommendation created')
