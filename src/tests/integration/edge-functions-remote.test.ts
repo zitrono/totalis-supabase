@@ -301,6 +301,21 @@ describe('Edge Functions Remote Integration Tests', () => {
   })
 
   describe('Chat AI Response', () => {
+    let categoryId: string
+    
+    beforeAll(async () => {
+      // Get a category for testing
+      const { data: categories } = await adminSupabase
+        .from('categories')
+        .select('id')
+        .eq('is_active', true)
+        .limit(1)
+      
+      if (categories && categories.length > 0) {
+        categoryId = categories[0].id
+      }
+    })
+    
     it('should require authentication', async () => {
       const response = await fetch(`${config.supabaseUrl}/functions/v1/chat-ai-response`, {
         method: 'POST',
@@ -360,6 +375,15 @@ describe('Edge Functions Remote Integration Tests', () => {
     })
 
     it('should handle chat with specific context', async () => {
+      // Get a valid category ID first
+      const { data: categories } = await adminSupabase
+        .from('categories')
+        .select('id')
+        .eq('name', 'Stress Management')
+        .single()
+      
+      const validCategoryId = categories?.id || categoryId // fallback to the one from beforeAll
+      
       // First create a check-in for context
       const checkinResponse = await fetch(`${config.supabaseUrl}/functions/v1/checkin-start`, {
         method: 'POST',
@@ -368,7 +392,7 @@ describe('Edge Functions Remote Integration Tests', () => {
           'Authorization': `Bearer ${authToken}`
         },
         body: JSON.stringify({
-          categoryId: 'stress-management'
+          categoryId: validCategoryId
         })
       })
 
