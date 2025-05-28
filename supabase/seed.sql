@@ -79,4 +79,4 @@ ON CONFLICT DO NOTHING;
 
 -- Grant necessary permissions for anonymous users
 GRANT USAGE ON SCHEMA public TO anon;
-GRANT SELECT ON coaches, categories, app_config TO anon;
+GRANT SELECT ON coaches, categories, app_config TO anon;-- CI/CD test comment
