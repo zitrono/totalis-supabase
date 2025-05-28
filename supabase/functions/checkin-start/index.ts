@@ -1,3 +1,6 @@
+/// <reference lib="deno.ns" />
+/// <reference lib="dom" />
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
 import { corsHeaders } from "../_shared/cors.ts"
@@ -140,11 +143,12 @@ serve(async (req) => {
       }
     )
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error)
     monitoring.trackError(error as Error, user?.id)
     console.error('Check-in start error:', error)
     
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: errorMessage }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500
