@@ -16,170 +16,80 @@ const TEST_USERS: TestUser[] = [
 export async function setupTestUsers(): Promise<void> {
   const config = getTestConfig()
   
-  // Only run in preview mode
-  if (!config.isPreview) {
-    console.log('⏭️  Skipping test user setup (not in preview mode)')
-    return
-  }
+  console.log('🧪 Setting up test environment...')
   
-  console.log('🧪 Setting up test users for preview environment...')
-  
-  // Create admin client with service role key
-  const adminClient = createClient(config.supabaseUrl, config.supabaseServiceKey, {
+  // Create service client
+  const serviceClient = createClient(config.supabaseUrl, config.supabaseServiceKey, {
     auth: {
       autoRefreshToken: false,
       persistSession: false
     }
   })
   
-  // Ensure coaches exist
-  console.log('Ensuring coaches exist...')
-  const coachesData = [
-    { name: 'Daniel', bio: 'Your supportive wellness coach focused on holistic health and mindfulness.', sex: 'male', is_active: true },
-    { name: 'Sarah', bio: 'An empathetic guide specializing in mental health and emotional wellbeing.', sex: 'female', is_active: true },
-    { name: 'Alex', bio: 'A balanced coach who integrates physical and mental wellness strategies.', sex: 'female', is_active: true }
-  ]
-  
-  for (const coach of coachesData) {
-    // First check if coach exists
-    const { data: existingCoach } = await adminClient
-      .from('coaches')
-      .select('id')
-      .eq('name', coach.name)
-      .single()
+  // For preview branches, we can't create users in auth.users
+  // Instead, we'll ensure test profiles exist that can be linked when users sign in
+  if (config.isPreview) {
+    console.log('📝 Running in preview mode - setting up test profiles')
     
-    if (!existingCoach) {
-      // Insert if doesn't exist
-      const { error: coachInsertError } = await adminClient
-        .from('coaches')
-        .insert(coach)
-      
-      if (coachInsertError) {
-        console.error(`Failed to insert coach ${coach.name}:`, coachInsertError)
-      }
+    // Call the setup_test_users function we created in the migration
+    const { data, error } = await serviceClient.rpc('setup_test_users')
+    
+    if (error) {
+      console.error('Failed to setup test users:', error)
+      throw error
     }
+    
+    console.log('✅ Test profiles created:', data)
+    return
   }
   
-  // Ensure categories exist
-  console.log('Ensuring categories exist...')
-  const categoriesData = [
-    { name: 'Physical Health', name_short: 'Physical', description: 'Focus on your body\'s wellbeing through exercise, nutrition, and rest', sort_order: 100, is_active: true, checkin_enabled: true, primary_color: '#4CAF50', secondary_color: '#81C784' },
-    { name: 'Mental Health', name_short: 'Mental', description: 'Nurture your mind through mindfulness, stress management, and emotional balance', sort_order: 200, is_active: true, checkin_enabled: true, primary_color: '#2196F3', secondary_color: '#64B5F6' },
-    { name: 'Social Wellness', name_short: 'Social', description: 'Build meaningful relationships and community connections', sort_order: 300, is_active: true, checkin_enabled: true, primary_color: '#FF9800', secondary_color: '#FFB74D' },
-    { name: 'Personal Growth', name_short: 'Growth', description: 'Develop new skills and pursue your goals', sort_order: 400, is_active: true, checkin_enabled: true, primary_color: '#9C27B0', secondary_color: '#BA68C8' }
-  ]
+  // For production testing, we can create actual auth users
+  console.log('🔐 Running in production mode - creating auth users')
   
-  for (const category of categoriesData) {
-    // First check if category exists
-    const { data: existingCategory } = await adminClient
-      .from('categories')
-      .select('id')
-      .eq('name', category.name)
-      .single()
-    
-    if (!existingCategory) {
-      // Insert if doesn't exist
-      const { error: categoryInsertError } = await adminClient
-        .from('categories')
-        .insert(category)
-      
-      if (categoryInsertError) {
-        console.error(`Failed to insert category ${category.name}:`, categoryInsertError)
-      }
-    }
-  }
-  
-  // Get default coach ID
-  let defaultCoachId: string
-  
-  const { data: coaches, error: coachError } = await adminClient
+  // Get default coach ID from seed data
+  const { data: coaches } = await serviceClient
     .from('coaches')
     .select('id')
     .eq('name', 'Daniel')
     .limit(1)
   
-  if (coachError || !coaches || coaches.length === 0) {
-    console.error('Failed to get default coach:', coachError)
-    console.log('Creating fallback coach...')
-    
-    // Create a fallback coach if none exists
-    const { data: newCoach, error: createError } = await adminClient
-      .from('coaches')
-      .insert({ 
-        name: 'Daniel', 
-        bio: 'Your supportive wellness coach focused on holistic health and mindfulness.', 
-        sex: 'male', 
-        is_active: true 
-      })
-      .select('id')
-      .single()
-    
-    if (createError || !newCoach) {
-      throw new Error(`Failed to create default coach: ${createError?.message || 'Unknown error'}`)
-    }
-    
-    defaultCoachId = newCoach.id
-  } else {
-    defaultCoachId = coaches[0].id
+  const defaultCoachId = coaches?.[0]?.id
+  
+  if (!defaultCoachId) {
+    throw new Error('Default coach not found - ensure seed data is applied')
   }
   
-  // Create test users
+  // In production, we can create test users via auth.admin API
   for (const testUser of TEST_USERS) {
     try {
       // Check if user already exists
-      const { data: existingUser } = await adminClient.auth.admin.listUsers()
-      const userExists = existingUser?.users?.some(u => u.email === testUser.email)
+      const { data: existingAuth } = await serviceClient.auth.signInWithPassword({
+        email: testUser.email,
+        password: testUser.password
+      })
       
-      if (userExists) {
+      if (existingAuth?.user) {
         console.log(`✅ Test user ${testUser.email} already exists`)
         continue
       }
       
-      // Create user using admin API to bypass email verification
-      const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({
+      // Create new user via signup (works in production)
+      const { data: newAuth, error: signUpError } = await serviceClient.auth.signUp({
         email: testUser.email,
         password: testUser.password,
-        email_confirm: true, // Bypass email verification
-        user_metadata: testUser.metadata || {}
+        options: {
+          data: testUser.metadata
+        }
       })
       
-      if (createError) {
-        // If user already exists error, continue
-        if (createError.message?.includes('already exists')) {
-          console.log(`✅ Test user ${testUser.email} already exists`)
-          continue
-        }
-        throw createError
-      }
-      
-      if (!newUser?.user) {
-        throw new Error('User creation returned no user data')
-      }
-      
-      // Create profile for the user
-      const { error: profileError } = await adminClient
-        .from('profiles')
-        .insert({
-          id: newUser.user.id,
-          coach_id: defaultCoachId,
-          metadata: {
-            test_account: true,
-            permanent: true,
-            created_at: new Date().toISOString()
-          }
-        })
-      
-      if (profileError) {
-        // If profile already exists, that's fine
-        if (!profileError.message?.includes('duplicate key')) {
-          console.warn(`⚠️  Failed to create profile for ${testUser.email}: ${profileError.message}`)
-        }
+      if (signUpError && !signUpError.message?.includes('already registered')) {
+        throw signUpError
       }
       
       console.log(`✅ Created test user: ${testUser.email}`)
     } catch (error) {
-      console.error(`❌ Failed to create test user ${testUser.email}:`, error)
-      // Continue with other users even if one fails
+      console.error(`⚠️  Issue with test user ${testUser.email}:`, error)
+      // Continue with other users
     }
   }
   

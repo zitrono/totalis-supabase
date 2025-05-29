@@ -1,5 +1,5 @@
 -- Seed data for Totalis
--- Last updated: 2025-05-29 (JWT-based version without auth.users access)
+-- Last updated: 2025-05-29 (Authenticated-only version)
 
 -- Insert default coaches
 INSERT INTO coaches (name, bio, sex, is_active) VALUES
@@ -82,22 +82,15 @@ WHERE
   (p.name = 'Personal Growth' AND c.name IN ('Learning', 'Career', 'Creativity'))
 ON CONFLICT DO NOTHING;
 
--- Create test user profiles without touching auth.users
--- Note: In preview branches, test users should be created via the Supabase Auth API
--- or by using the create_profile_if_needed() function after authentication
+-- For testing in preview branches, we'll use a different approach
+-- Test users will be created via a special migration that only runs in test environments
+-- See: migrations/*_test_users_preview_only.sql
 
--- Insert sample messages for documentation purposes only
--- These would normally be created by authenticated users
+-- Log seed completion
 INSERT INTO system_logs (log_level, component, message, metadata) VALUES
   ('info', 'seed', 'Seed data applied successfully', jsonb_build_object(
     'timestamp', NOW(),
     'coaches_count', (SELECT COUNT(*) FROM coaches),
     'categories_count', (SELECT COUNT(*) FROM categories),
-    'note', 'Test users should be created via Auth API in preview branches'
+    'environment', current_setting('app.environment', true)
   ));
-
--- Note: Previous version of seed.sql created test users directly in auth.users
--- This is not allowed in preview branches. Instead:
--- 1. Use Supabase Auth API to create test users
--- 2. Call create_profile_if_needed() RPC function after auth
--- 3. Or use service role key for testing

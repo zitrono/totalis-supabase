@@ -77,8 +77,8 @@ enable_refresh_token_rotation = true
 refresh_token_reuse_interval = 10
 # Allow/disallow new user signups to your project.
 enable_signup = true
-# Enable anonymous sign-ins for testing
-enable_anonymous_sign_ins = true
+# Disable anonymous sign-ins - authenticated users only
+enable_anonymous_sign_ins = false
 
 [auth.email]
 # Allow/disallow new user signups via email to your project.
