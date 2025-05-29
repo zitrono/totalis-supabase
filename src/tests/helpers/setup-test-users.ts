@@ -49,7 +49,7 @@ export async function setupTestUsers(): Promise<void> {
   // Ensure categories exist
   console.log('Ensuring categories exist...')
   const categoriesData = [
-    { name: 'Physical Health', name_short: 'Physical', description: 'Focus on your body''s wellbeing through exercise, nutrition, and rest', sort_order: 100, is_active: true, checkin_enabled: true, primary_color: '#4CAF50', secondary_color: '#81C784' },
+    { name: 'Physical Health', name_short: 'Physical', description: 'Focus on your body\'s wellbeing through exercise, nutrition, and rest', sort_order: 100, is_active: true, checkin_enabled: true, primary_color: '#4CAF50', secondary_color: '#81C784' },
     { name: 'Mental Health', name_short: 'Mental', description: 'Nurture your mind through mindfulness, stress management, and emotional balance', sort_order: 200, is_active: true, checkin_enabled: true, primary_color: '#2196F3', secondary_color: '#64B5F6' },
     { name: 'Social Wellness', name_short: 'Social', description: 'Build meaningful relationships and community connections', sort_order: 300, is_active: true, checkin_enabled: true, primary_color: '#FF9800', secondary_color: '#FFB74D' },
     { name: 'Personal Growth', name_short: 'Growth', description: 'Develop new skills and pursue your goals', sort_order: 400, is_active: true, checkin_enabled: true, primary_color: '#9C27B0', secondary_color: '#BA68C8' }

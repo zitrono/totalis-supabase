@@ -5,7 +5,10 @@ const config = getTestConfig()
 const supabase = createClient(config.supabaseUrl, config.supabaseServiceKey)
 
 describe('Anonymous User RLS Restrictions', () => {
-  describe('Anonymous user access control', () => {
+  // Skip anonymous tests in preview environments as anonymous sign-ins may not be enabled
+  const describeOrSkip = config.isPreview ? describe.skip : describe
+  
+  describeOrSkip('Anonymous user access control', () => {
     let anonClient: any
     let anonymousUserId: string
 
