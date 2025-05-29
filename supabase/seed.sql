@@ -83,79 +83,87 @@ DO $$
 DECLARE
   test_user_id UUID;
   default_coach_id UUID;
+  existing_user_id UUID;
 BEGIN
   -- Get default coach ID
   SELECT id INTO default_coach_id FROM coaches WHERE name = 'Daniel' LIMIT 1;
   
   -- Create test users
   FOR i IN 1..5 LOOP
-    test_user_id := gen_random_uuid();
+    -- Check if user already exists
+    SELECT id INTO existing_user_id 
+    FROM auth.users 
+    WHERE email = 'test' || i || '@totalis.app';
     
-    -- Insert user into auth.users
-    INSERT INTO auth.users (
-      instance_id,
-      id,
-      aud,
-      role,
-      email,
-      encrypted_password,
-      email_confirmed_at,
-      raw_app_meta_data,
-      raw_user_meta_data,
-      created_at,
-      updated_at
-    ) VALUES (
-      '00000000-0000-0000-0000-000000000000',
-      test_user_id,
-      'authenticated',
-      'authenticated',
-      'test' || i || '@totalis.app',
-      crypt('Test123!@#', gen_salt('bf')),
-      NOW(),
-      '{"provider":"email","providers":["email"]}',
-      '{"test_account":true}',
-      NOW(),
-      NOW()
-    ) ON CONFLICT (email) DO NOTHING;
-    
-    -- Create identity for the user (required for auth to work properly)
-    INSERT INTO auth.identities (
-      id,
-      provider_id,
-      user_id,
-      identity_data,
-      provider,
-      last_sign_in_at,
-      created_at,
-      updated_at
-    ) VALUES (
-      gen_random_uuid(),
-      test_user_id,
-      test_user_id,
-      jsonb_build_object(
-        'sub', test_user_id::text,
-        'email', 'test' || i || '@totalis.app'
-      ),
-      'email',
-      NOW(),
-      NOW(),
-      NOW()
-    ) ON CONFLICT (provider, provider_id) DO NOTHING;
-    
-    -- Create profile for the user
-    INSERT INTO public.profiles (
-      id,
-      coach_id,
-      metadata
-    ) VALUES (
-      test_user_id,
-      default_coach_id,
-      jsonb_build_object(
-        'test_account', true,
-        'permanent', true,
-        'created_at', NOW()
-      )
-    ) ON CONFLICT (id) DO NOTHING;
+    IF existing_user_id IS NULL THEN
+      test_user_id := gen_random_uuid();
+      
+      -- Insert user into auth.users
+      INSERT INTO auth.users (
+        instance_id,
+        id,
+        aud,
+        role,
+        email,
+        encrypted_password,
+        email_confirmed_at,
+        raw_app_meta_data,
+        raw_user_meta_data,
+        created_at,
+        updated_at
+      ) VALUES (
+        '00000000-0000-0000-0000-000000000000',
+        test_user_id,
+        'authenticated',
+        'authenticated',
+        'test' || i || '@totalis.app',
+        crypt('Test123!@#', gen_salt('bf')),
+        NOW(),
+        '{"provider":"email","providers":["email"]}',
+        '{"test_account":true}',
+        NOW(),
+        NOW()
+      );
+      
+      -- Create identity for the user (required for auth to work properly)
+      INSERT INTO auth.identities (
+        id,
+        provider_id,
+        user_id,
+        identity_data,
+        provider,
+        last_sign_in_at,
+        created_at,
+        updated_at
+      ) VALUES (
+        gen_random_uuid(),
+        test_user_id,
+        test_user_id,
+        jsonb_build_object(
+          'sub', test_user_id::text,
+          'email', 'test' || i || '@totalis.app'
+        ),
+        'email',
+        NOW(),
+        NOW(),
+        NOW()
+      );
+      
+      -- Create profile for the user
+      INSERT INTO public.profiles (
+        id,
+        coach_id,
+        metadata
+      ) VALUES (
+        test_user_id,
+        default_coach_id,
+        jsonb_build_object(
+          'test_account', true,
+          'permanent', true,
+          'created_at', NOW()
+        )
+      );
+    END IF;
   END LOOP;
 END $$;
 
