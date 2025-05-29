@@ -24,48 +24,57 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Wait for preview environment
-        run: |
-          echo "⏳ Waiting for Supabase preview environment to be ready..."
-          # Supabase GitHub integration creates preview branches automatically
-          # Wait 3 minutes for it to be fully provisioned and edge functions deployed
-          sleep 180
+      - name: Wait for Supabase Preview to be ready
+        uses: fountainhead/action-wait-for-check@v1.2.0
+        id: wait-for-preview
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          checkName: 'Supabase Preview'
+          ref: ${{ github.event.pull_request.head.sha }}
+          timeoutSeconds: 300
+          intervalSeconds: 15
 
-      - name: Get preview branch details
-        id: preview
+      - name: Get preview branch credentials
+        uses: 0xbigboss/supabase-branch-gh-action@v1.0.2
+        id: supabase-branch
+        continue-on-error: true
+        with:
+          supabase-access-token: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          supabase-project-id: ${{ secrets.SUPABASE_PROJECT_ID }}
+          # The branch name is the PR branch name
+          branch-name: ${{ github.head_ref }}
+
+      - name: Display preview info
+        if: steps.supabase-branch.outcome == 'success'
         run: |
-          echo "🔍 Getting preview branch information..."
-          # The Supabase bot comments with the preview project ID
-          # For now, we'll note that manual configuration is needed
-          echo "ℹ️  Preview branch has been created by Supabase GitHub integration"
-          echo "ℹ️  To run tests against preview, add these secrets to your repo:"
-          echo "    - PREVIEW_SUPABASE_URL"
-          echo "    - PREVIEW_SUPABASE_ANON_KEY" 
-          echo "    - PREVIEW_SUPABASE_SERVICE_KEY"
+          echo "🎯 Preview Environment Details:"
+          echo "   API URL: ${{ steps.supabase-branch.outputs.api_url }}"
+          echo "   DB Host: ${{ steps.supabase-branch.outputs.db_host }}"
+          echo "   Branch: ${{ github.head_ref }}"
           echo ""
-          echo "🔗 Get these values from your preview branch dashboard"
+          echo "✅ Preview environment is ready for testing!"
+
+      - name: Fallback info
+        if: steps.supabase-branch.outcome != 'success'
+        run: |
+          echo "⚠️  Could not automatically get preview credentials"
+          echo "   Falling back to main project for testing"
+          echo ""
+          echo "   This might be because:"
+          echo "   - The preview branch is still being created"
+          echo "   - The third-party action needs updating"
+          echo "   - Access token permissions"
 
       - name: Run integration tests
-        run: |
-          # Check if preview secrets are configured
-          if [ -n "${{ secrets.PREVIEW_SUPABASE_URL }}" ]; then
-            echo "🧪 Running integration tests against preview environment..."
-            export SUPABASE_URL="${{ secrets.PREVIEW_SUPABASE_URL }}"
-            export SUPABASE_ANON_KEY="${{ secrets.PREVIEW_SUPABASE_ANON_KEY }}"
-            export SUPABASE_SERVICE_KEY="${{ secrets.PREVIEW_SUPABASE_SERVICE_KEY }}"
-          else
-            echo "⚠️  Preview secrets not configured, running against main project..."
-            echo "ℹ️  This is expected for the first PR after enabling branching"
-            export SUPABASE_URL="${{ secrets.SUPABASE_URL }}"
-            export SUPABASE_ANON_KEY="${{ secrets.SUPABASE_ANON_KEY }}"
-            export SUPABASE_SERVICE_KEY="${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}"
-          fi
-          
-          npm run test:integration
+        run: npm run test:integration
         env:
+          SUPABASE_URL: ${{ steps.supabase-branch.outputs.api_url || secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ steps.supabase-branch.outputs.anon_key || secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_KEY: ${{ steps.supabase-branch.outputs.service_role_key || secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          DATABASE_URL: ${{ steps.supabase-branch.outputs.api_url && format('postgresql://postgres:{0}@{1}:{2}/postgres', steps.supabase-branch.outputs.db_pass, steps.supabase-branch.outputs.db_host, steps.supabase-branch.outputs.db_port) || secrets.DATABASE_URL }}
           ENVIRONMENT: preview
           NODE_ENV: test
-          IS_PREVIEW: true
+          IS_PREVIEW: ${{ steps.supabase-branch.outcome == 'success' }}
 
       - name: Comment test results
         if: always()
@@ -73,21 +82,25 @@ jobs:
         with:
           script: |
             const status = '${{ job.status }}' === 'success' ? '✅' : '❌';
-            const usingPreview = '${{ secrets.PREVIEW_SUPABASE_URL }}' !== '';
+            const previewUrl = '${{ steps.supabase-branch.outputs.api_url }}';
             
-            let message = `${status} **Integration Tests**: ${{ job.status }}\n\n`;
+            let message = `${status} **Preview Environment Tests**: ${{ job.status }}\n\n`;
             
-            if (usingPreview) {
-              message += `Tests ran against: Preview environment\n`;
+            if (previewUrl) {
+              message += `🎯 **Tests ran against preview environment**\n`;
+              message += `   Preview URL: \`${previewUrl}\`\n`;
+              message += `   Branch: \`${{ github.head_ref }}\`\n\n`;
+              
+              if ('${{ job.status }}' === 'success') {
+                message += `All integration tests passed against the preview environment! 🎉`;
+              }
+            } else if ('${{ steps.wait-for-preview.outcome }}' === 'failure') {
+              message += `⚠️ **Preview environment not ready**\n\n`;
+              message += `The Supabase preview branch is still being created. This is normal for new PRs.\n`;
+              message += `Please wait a few minutes and re-run the workflow.`;
             } else {
-              message += `Tests ran against: Main project (preview secrets not configured)\n\n`;
-              message += `To enable preview testing:\n`;
-              message += `1. Check the Supabase bot comment above for your preview project link\n`;
-              message += `2. Get API credentials from the preview project Settings → API\n`;
-              message += `3. Add these as GitHub secrets:\n`;
-              message += `   - \`PREVIEW_SUPABASE_URL\`\n`;
-              message += `   - \`PREVIEW_SUPABASE_ANON_KEY\`\n`;
-              message += `   - \`PREVIEW_SUPABASE_SERVICE_KEY\`\n`;
+              message += `❌ **Could not access preview environment**\n\n`;
+              message += `This might be due to missing credentials or configuration issues.`;
             }
             
             try {
