@@ -2,6 +2,7 @@ import { describe, test, expect, beforeAll, afterAll, beforeEach } from '@jest/g
 import { createClient, SupabaseClient, User } from '@supabase/supabase-js'
 import { getTestConfig, logTestConfig } from '../config/test-env'
 import { createTestClients, getServiceClient } from '../helpers/test-client'
+import { setupTestUsers } from '../helpers/setup-test-users'
 import * as fs from 'fs'
 import * as path from 'path'
 
@@ -13,6 +14,11 @@ describe('SDK Operations - Priority 1 Mobile Migration', () => {
   beforeAll(async () => {
     const config = getTestConfig()
     logTestConfig(config)
+    
+    if (config.isPreview) {
+      console.log('🔧 Setting up test users for preview environment...')
+      await setupTestUsers()
+    }
     
     supabase = createClient(config.supabaseUrl, config.supabaseServiceKey, {
       auth: {

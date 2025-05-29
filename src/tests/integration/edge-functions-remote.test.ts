@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from '@jest/globals'
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import { getTestConfig, logTestConfig, TestConfig } from '../config/test-env'
+import { setupTestUsers } from '../helpers/setup-test-users'
 
 describe('Edge Functions Remote Integration Tests', () => {
   let supabase: SupabaseClient
@@ -31,6 +32,12 @@ describe('Edge Functions Remote Integration Tests', () => {
       config.supabaseUrl,
       config.supabaseAnonKey
     )
+
+    // Setup test users if in preview mode
+    if (config.isPreview) {
+      console.log('🔧 Setting up test users for preview environment...')
+      await setupTestUsers()
+    }
 
     // Use pre-created test user to avoid rate limits
     console.log('🔐 Signing in with pre-created test user...')

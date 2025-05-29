@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import { getTestConfig } from '../config/test-env'
 import { randomUUID } from 'crypto'
 import { createTestClients, getServiceClient } from '../helpers/test-client'
+import { setupTestUsers } from '../helpers/setup-test-users'
 
 describe('Database Views', () => {
   let testUserId: string
@@ -11,6 +12,12 @@ describe('Database Views', () => {
   let userClient: any
 
   beforeAll(async () => {
+    const config = getTestConfig()
+    if (config.isPreview) {
+      console.log('🔧 Setting up test users for preview environment...')
+      await setupTestUsers()
+    }
+    
     // Get test clients
     const clients = await createTestClients('test2@totalis.app', 'Test123!@#')
     serviceClient = clients.serviceClient
