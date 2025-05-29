@@ -41,9 +41,13 @@ export async function setupTestUsers(): Promise<void> {
   ]
   
   for (const coach of coachesData) {
-    await adminClient
+    const { error: coachUpsertError } = await adminClient
       .from('coaches')
       .upsert(coach, { onConflict: 'name' })
+    
+    if (coachUpsertError) {
+      console.error(`Failed to upsert coach ${coach.name}:`, coachUpsertError)
+    }
   }
   
   // Ensure categories exist
@@ -62,17 +66,38 @@ export async function setupTestUsers(): Promise<void> {
   }
   
   // Get default coach ID
+  let defaultCoachId: string
+  
   const { data: coaches, error: coachError } = await adminClient
     .from('coaches')
     .select('id')
     .eq('name', 'Daniel')
-    .single()
+    .limit(1)
   
-  if (coachError || !coaches) {
-    throw new Error(`Failed to get default coach: ${coachError?.message || 'Coach not found'}`)
+  if (coachError || !coaches || coaches.length === 0) {
+    console.error('Failed to get default coach:', coachError)
+    console.log('Creating fallback coach...')
+    
+    // Create a fallback coach if none exists
+    const { data: newCoach, error: createError } = await adminClient
+      .from('coaches')
+      .insert({ 
+        name: 'Daniel', 
+        bio: 'Your supportive wellness coach focused on holistic health and mindfulness.', 
+        sex: 'male', 
+        is_active: true 
+      })
+      .select('id')
+      .single()
+    
+    if (createError || !newCoach) {
+      throw new Error(`Failed to create default coach: ${createError?.message || 'Unknown error'}`)
+    }
+    
+    defaultCoachId = newCoach.id
+  } else {
+    defaultCoachId = coaches[0].id
   }
-  
-  const defaultCoachId = coaches.id
   
   // Create test users
   for (const testUser of TEST_USERS) {
