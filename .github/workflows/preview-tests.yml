@@ -73,12 +73,24 @@ jobs:
           echo "base_url=$BASE_URL" >> $GITHUB_OUTPUT
           echo "Constructed base URL: $BASE_URL"
 
+      - name: Verify test data exists
+        run: |
+          echo "🔍 Checking if test users exist in preview database..."
+          # Use psql to check if test users exist
+          export PGPASSWORD="${{ steps.supabase-branch.outputs.db_password }}"
+          psql "postgresql://postgres@${{ steps.supabase-branch.outputs.db_host }}:${{ steps.supabase-branch.outputs.db_port }}/postgres" \
+            -c "SELECT email, created_at FROM auth.users WHERE email LIKE 'test%@totalis.app' ORDER BY email;" || true
+          
+          echo "🔍 Checking auth settings..."
+          psql "postgresql://postgres@${{ steps.supabase-branch.outputs.db_host }}:${{ steps.supabase-branch.outputs.db_port }}/postgres" \
+            -c "SELECT key, value FROM auth.config WHERE key IN ('enable_anonymous_sign_ins', 'enable_signup');" || true
+
       - name: Run integration tests against preview
         run: npm run test:integration
         env:
           SUPABASE_URL: ${{ steps.preview-url.outputs.base_url }}
           SUPABASE_ANON_KEY: ${{ steps.supabase-branch.outputs.anon_key }}
-          SUPABASE_SERVICE_KEY: ${{ steps.supabase-branch.outputs.service_role_key }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ steps.supabase-branch.outputs.service_role_key }}
           DATABASE_URL: postgresql://postgres:${{ steps.supabase-branch.outputs.db_password }}@${{ steps.supabase-branch.outputs.db_host }}:${{ steps.supabase-branch.outputs.db_port }}/postgres
           ENVIRONMENT: preview
           NODE_ENV: test
