@@ -119,6 +119,7 @@ describe('Edge Functions Remote Integration Tests', () => {
   describe('Check-in Flow', () => {
     let checkInId: string
     let categoryId: string
+    let currentQuestionId: string
 
     beforeAll(async () => {
       // Get a category
@@ -136,33 +137,38 @@ describe('Edge Functions Remote Integration Tests', () => {
     })
 
     it('should start a check-in with test metadata', async () => {
-      const response = await fetch(`${config.supabaseUrl}/functions/v1/checkin-start`, {
+      const response = await fetch(`${config.supabaseUrl}/functions/v1/checkin`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${authToken}`
         },
-        body: JSON.stringify({ categoryId })
+        body: JSON.stringify({ 
+          action: 'start',
+          categoryId 
+        })
       })
 
       expect(response.status).toBe(200)
       const data = await response.json() as any
       expect(data.checkIn.status).toBe('in_progress')
       expect(Array.isArray(data.questions)).toBe(true)
+      expect(data.currentQuestion).toBeDefined()
       checkInId = data.checkIn.id
+      currentQuestionId = data.currentQuestion.id
 
       // Test data created in preview instance
     })
 
-    it.skip('should process check-in response', async () => {
-      // Skip - checkin system needs redesign to support structured questions
+    it.skip('should answer check-in question', async () => {
+      // Skip - edge function needs deployment
       // Skip if no checkInId from previous test
-      if (!checkInId) {
-        console.log('Skipping - no checkInId from start test')
+      if (!checkInId || !currentQuestionId) {
+        console.log('Skipping - no checkInId or questionId from start test')
         return
       }
       
-      const response = await fetch(`${config.supabaseUrl}/functions/v1/checkin-process`, {
+      const response = await fetch(`${config.supabaseUrl}/functions/v1/checkin`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -170,31 +176,34 @@ describe('Edge Functions Remote Integration Tests', () => {
         },
         body: JSON.stringify({
           action: 'answer',
-          checkin_id: checkInId,
-          question_id: 'q1',
-          answer: 'Good, thanks!'
+          checkinId: checkInId,
+          questionId: currentQuestionId,
+          answer: 'I feel good today!'
         })
       })
 
       if (response.status !== 200) {
         const errorText = await response.text()
-        console.error('Check-in process error:', response.status, errorText)
+        console.error('Check-in answer error:', response.status, errorText)
       }
       expect(response.status).toBe(200)
       const data = await response.json() as any
-      expect(data.nextQuestion).toBeDefined()
-      expect(data.status).toBe('in_progress')
+      expect(data.success).toBe(true)
+      
+      if (data.nextQuestion) {
+        currentQuestionId = data.nextQuestion.id
+      }
     })
 
     it.skip('should complete check-in', async () => {
-      // Skip - checkin system needs redesign to support structured questions
+      // Skip - edge function needs deployment
       // Skip if no checkInId from previous test
       if (!checkInId) {
         console.log('Skipping - no checkInId from start test')
         return
       }
       
-      const response = await fetch(`${config.supabaseUrl}/functions/v1/checkin-process`, {
+      const response = await fetch(`${config.supabaseUrl}/functions/v1/checkin`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -202,8 +211,11 @@ describe('Edge Functions Remote Integration Tests', () => {
         },
         body: JSON.stringify({
           action: 'complete',
-          checkin_id: checkInId,
-          answer: 'All good!'
+          checkinId: checkInId,
+          proposals: [
+            { title: 'Take a walk', content: 'Go for a 15-minute walk outside' },
+            { title: 'Breathing exercise', content: 'Try 5 minutes of deep breathing' }
+          ]
         })
       })
 
@@ -213,10 +225,47 @@ describe('Edge Functions Remote Integration Tests', () => {
       }
       expect(response.status).toBe(200)
       const data = await response.json() as any
-      expect(data.status).toBe('completed')
+      expect(data.success).toBe(true)
+      expect(data.checkin.status).toBe('completed')
       expect(Array.isArray(data.recommendations)).toBe(true)
 
       // Messages created in preview instance
+    })
+
+    it.skip('should support abandoning check-in', async () => {
+      // Skip - edge function needs deployment
+      // Start a new check-in to abandon
+      const startResponse = await fetch(`${config.supabaseUrl}/functions/v1/checkin`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify({ 
+          action: 'start',
+          categoryId 
+        })
+      })
+
+      const startData = await startResponse.json() as any
+      const abandonCheckInId = startData.checkIn.id
+
+      // Now abandon it
+      const response = await fetch(`${config.supabaseUrl}/functions/v1/checkin`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify({
+          action: 'abandon',
+          checkinId: abandonCheckInId
+        })
+      })
+
+      expect(response.status).toBe(200)
+      const data = await response.json() as any
+      expect(data.success).toBe(true)
     })
   })
 
@@ -407,19 +456,20 @@ describe('Edge Functions Remote Integration Tests', () => {
       const validCategoryId = categories?.id || categoryId // fallback to the one from beforeAll
       
       // First create a check-in for context
-      const checkinResponse = await fetch(`${config.supabaseUrl}/functions/v1/checkin-start`, {
+      const checkinResponse = await fetch(`${config.supabaseUrl}/functions/v1/checkin`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${authToken}`
         },
         body: JSON.stringify({
+          action: 'start',
           categoryId: validCategoryId
         })
       })
 
       const checkinData = await checkinResponse.json() as any
-      const checkInId = checkinData.checkInId
+      const checkInId = checkinData.checkIn?.id || checkinData.checkinId
 
       // Now use the check-in as context
       const response = await fetch(`${config.supabaseUrl}/functions/v1/chat-ai-response`, {
