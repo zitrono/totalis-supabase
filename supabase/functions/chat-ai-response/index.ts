@@ -1,165 +1,167 @@
 /// <reference lib="deno.ns" />
 /// <reference lib="dom" />
 
-import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
-import { corsHeaders } from '../_shared/cors.ts'
-import { getUserContext } from '../_shared/supabase-client.ts'
-import { LangflowClient } from '../_shared/langflow-client.ts'
-import { ChatMessage } from '../_shared/types.ts'
-import { getTestMetadata, mergeTestMetadata } from '../_shared/test-data.ts'
+import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { corsHeaders } from "../_shared/cors.ts";
+import { getUserContext } from "../_shared/supabase-client.ts";
+import { LangflowClient } from "../_shared/langflow-client.ts";
+import { ChatMessage } from "../_shared/types.ts";
+import { getTestMetadata, mergeTestMetadata } from "../_shared/test-data.ts";
 
-const langflowClient = new LangflowClient()
+const langflowClient = new LangflowClient();
 
 serve(async (req) => {
   // Handle CORS
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
   }
 
   try {
     // Get auth header
-    const authHeader = req.headers.get('Authorization')
+    const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(
-        JSON.stringify({ error: 'Authorization required' }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 401
-        }
-      )
+        JSON.stringify({ error: "Authorization required" }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 401,
+        },
+      );
     }
 
     // Create Supabase client with service key for auth verification
     const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      { 
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      {
         global: { headers: { Authorization: authHeader } },
         auth: {
           autoRefreshToken: false,
-          persistSession: false
-        }
-      }
-    )
-    
+          persistSession: false,
+        },
+      },
+    );
+
     // Get authenticated user - extract token from header
-    const token = authHeader.replace('Bearer ', '')
-    const { data: { user }, error: userError } = await supabase.auth.getUser(token)
+    const token = authHeader.replace("Bearer ", "");
+    const { data: { user }, error: userError } = await supabase.auth.getUser(
+      token,
+    );
     if (userError || !user) {
       return new Response(
-        JSON.stringify({ error: 'Invalid authentication' }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 401
-        }
-      )
+        JSON.stringify({ error: "Invalid authentication" }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 401,
+        },
+      );
     }
 
     // Get request body
-    const { 
-      message, 
-      contextType, 
+    const {
+      message,
+      contextType,
       contextId,
       includeHistory = true,
-      conversationId = crypto.randomUUID()
-    } = await req.json()
-    
+      conversationId = crypto.randomUUID(),
+    } = await req.json();
+
     // Get test metadata
-    const testMetadata = getTestMetadata(req)
-    
+    const testMetadata = getTestMetadata(req);
+
     if (!message) {
       return new Response(
-        JSON.stringify({ error: 'Message is required' }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 400
-        }
-      )
+        JSON.stringify({ error: "Message is required" }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400,
+        },
+      );
     }
 
     // Get chat history if requested
-    let chatHistory: ChatMessage[] = []
+    let chatHistory: ChatMessage[] = [];
     if (includeHistory) {
       const { data: messages } = await supabase
-        .from('messages')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(10)
+        .from("messages")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(10);
 
-      chatHistory = messages?.map(m => ({
+      chatHistory = messages?.map((m) => ({
         id: m.id,
         userId: m.user_id,
         message: m.content,
-        isUser: m.role === 'user',
+        isUser: m.role === "user",
         timestamp: m.created_at,
         contextType: m.metadata?.context_type,
-        contextId: m.metadata?.context_id
-      })).reverse() || []
+        contextId: m.metadata?.context_id,
+      })).reverse() || [];
     }
 
     // Save user's message
     const { data: userMessage, error: saveUserError } = await supabase
-      .from('messages')
+      .from("messages")
       .insert({
         user_id: user.id,
         content: message,
-        role: 'user',
-        category_id: contextType === 'category' ? contextId : null,
+        role: "user",
+        category_id: contextType === "category" ? contextId : null,
         conversation_id: conversationId,
         metadata: mergeTestMetadata({
           context_type: contextType,
-          context_id: contextId
+          context_id: contextId,
         }, testMetadata),
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
       })
       .select()
-      .single()
+      .single();
 
     if (saveUserError) {
-      console.error('Error saving user message:', saveUserError)
+      console.error("Error saving user message:", saveUserError);
     }
 
     // Get user context
-    const context = await getUserContext(supabase, user.id)
+    const context = await getUserContext(supabase, user.id);
 
     // Get AI response from Langflow (mocked)
     const aiResponse = await langflowClient.getChatResponse(
       message,
       chatHistory,
-      context
-    )
+      context,
+    );
 
     // Save AI response
     const { data: aiMessage, error: saveAiError } = await supabase
-      .from('messages')
+      .from("messages")
       .insert({
         user_id: user.id,
         content: aiResponse,
-        role: 'assistant',
-        category_id: contextType === 'category' ? contextId : null,
+        role: "assistant",
+        category_id: contextType === "category" ? contextId : null,
         conversation_id: conversationId,
         coach_id: context.coachId,
         metadata: mergeTestMetadata({
           context_type: contextType,
-          context_id: contextId
+          context_id: contextId,
         }, testMetadata),
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
       })
       .select()
-      .single()
+      .single();
 
     if (saveAiError) {
-      console.error('Error saving AI message:', saveAiError)
+      console.error("Error saving AI message:", saveAiError);
     }
 
     // Get coach info for personalization
     const { data: coach } = await supabase
-      .from('coaches')
-      .select('name, voice')
-      .eq('id', context.coachId)
-      .single()
+      .from("coaches")
+      .select("name, voice")
+      .eq("id", context.coachId)
+      .single();
 
     // Return response
     return new Response(
@@ -170,60 +172,65 @@ serve(async (req) => {
         aiMessage: aiMessage,
         coach: coach,
         contextUsed: contextType,
-        metadata: testMetadata
+        metadata: testMetadata,
       }),
-      { 
-        headers: { 
+      {
+        headers: {
           ...corsHeaders,
-          'Content-Type': 'application/json'
+          "Content-Type": "application/json",
         },
-        status: 200
-      }
-    )
+        status: 200,
+      },
+    );
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error)
-    console.error('Chat AI response error:', error)
-    
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error("Chat AI response error:", error);
+
     return new Response(
-      JSON.stringify({ 
-        error: 'Failed to process chat message',
-        details: errorMessage 
+      JSON.stringify({
+        error: "Failed to process chat message",
+        details: errorMessage,
       }),
-      { 
-        headers: { 
+      {
+        headers: {
           ...corsHeaders,
-          'Content-Type': 'application/json'
+          "Content-Type": "application/json",
         },
-        status: 500
-      }
-    )
+        status: 500,
+      },
+    );
   }
-})
+});
 
 // AI response generation (mocked - replace with actual AI service)
-async function generateAIResponse(userMessage: string, context: any): Promise<string> {
+async function generateAIResponse(
+  userMessage: string,
+  context: any,
+): Promise<string> {
   // TODO: Replace with actual AI integration (OpenAI/Langflow)
-  
+
   // For now, return contextual mock responses
-  const greetings = ['hello', 'hi', 'hey', 'good morning', 'good afternoon']
-  const isGreeting = greetings.some(g => userMessage.toLowerCase().includes(g))
-  
+  const greetings = ["hello", "hi", "hey", "good morning", "good afternoon"];
+  const isGreeting = greetings.some((g) =>
+    userMessage.toLowerCase().includes(g)
+  );
+
   if (isGreeting) {
-    return `Hello ${context.userName}! I'm ${context.coachName}. How can I support your wellness journey today?`
+    return `Hello ${context.userName}! I'm ${context.coachName}. How can I support your wellness journey today?`;
   }
-  
-  if (userMessage.toLowerCase().includes('how are you')) {
-    return `I'm here to support you, ${context.userName}. Thank you for asking! How are you feeling today?`
+
+  if (userMessage.toLowerCase().includes("how are you")) {
+    return `I'm here to support you, ${context.userName}. Thank you for asking! How are you feeling today?`;
   }
-  
+
   if (context.checkinId) {
-    return `I understand you're going through a check-in. ${userMessage} - That's valuable insight. Can you tell me more about how this makes you feel?`
+    return `I understand you're going through a check-in. ${userMessage} - That's valuable insight. Can you tell me more about how this makes you feel?`;
   }
-  
+
   if (context.categoryId) {
-    return `Regarding your wellness journey, ${userMessage} - I hear you. What specific aspect would you like to explore further?`
+    return `Regarding your wellness journey, ${userMessage} - I hear you. What specific aspect would you like to explore further?`;
   }
-  
+
   // Default response
-  return `Thank you for sharing that, ${context.userName}. ${context.coachPersonality} How would you like to proceed with this?`
+  return `Thank you for sharing that, ${context.userName}. ${context.coachPersonality} How would you like to proceed with this?`;
 }
