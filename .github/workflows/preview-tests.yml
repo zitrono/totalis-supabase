@@ -40,7 +40,7 @@ jobs:
         with:
           supabase-access-token: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           supabase-project-id: ${{ secrets.SUPABASE_PROJECT_ID }}
-          wait-for-migrations: true
+          wait-for-migrations: false
           timeout: 120
 
       - name: Display preview info
