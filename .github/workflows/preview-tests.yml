@@ -62,6 +62,7 @@ jobs:
           echo "   anon_key: [REDACTED]"
           echo "   service_role_key: [REDACTED]"
           echo ""
+          echo "⚠️  Note: GitHub Actions doesn't support IPv6, cannot connect directly to DB"
           echo "✅ Preview environment is ready for testing!"
 
       - name: Construct preview URL
@@ -73,52 +74,12 @@ jobs:
           echo "base_url=$BASE_URL" >> $GITHUB_OUTPUT
           echo "Constructed base URL: $BASE_URL"
 
-      - name: Wait for automatic seeding to complete
+      - name: Wait for preview environment to stabilize
         run: |
-          echo "⏳ Waiting for automatic seeding to complete..."
-          export PGPASSWORD="${{ steps.supabase-branch.outputs.db_password }}"
-          DB_URL="postgresql://postgres@${{ steps.supabase-branch.outputs.db_host }}:${{ steps.supabase-branch.outputs.db_port }}/postgres"
-          
-          # Wait up to 2 minutes for test users to appear
-          for i in {1..24}; do
-            echo "Attempt $i/24: Checking for test users..."
-            
-            # Check if test users exist
-            USER_COUNT=$(psql "$DB_URL" -t -c "SELECT COUNT(*) FROM auth.users WHERE email LIKE 'test%@totalis.app';" 2>/dev/null || echo "0")
-            USER_COUNT=$(echo $USER_COUNT | xargs)  # Trim whitespace
-            
-            if [ "$USER_COUNT" -ge "3" ]; then
-              echo "✅ Found $USER_COUNT test users! Automatic seeding complete."
-              break
-            else
-              echo "Found $USER_COUNT test users, waiting for automatic seeding..."
-              sleep 5
-            fi
-          done
-          
-          # Final check
-          if [ "$USER_COUNT" -lt "3" ]; then
-            echo "❌ Test users not found after 2 minutes. Attempting manual seed..."
-            psql "$DB_URL" < supabase/seed.sql
-          fi
-
-      - name: Verify seed data
-        run: |
-          echo "🔍 Verifying seed data..."
-          export PGPASSWORD="${{ steps.supabase-branch.outputs.db_password }}"
-          DB_URL="postgresql://postgres@${{ steps.supabase-branch.outputs.db_host }}:${{ steps.supabase-branch.outputs.db_port }}/postgres"
-          
-          # Verify test users exist
-          echo "📋 Checking test users:"
-          psql "$DB_URL" -c "SELECT email, created_at FROM auth.users WHERE email LIKE 'test%@totalis.app' ORDER BY email;"
-          
-          # Check auth settings
-          echo "🔍 Checking auth configuration:"
-          psql "$DB_URL" -c "SELECT key, value FROM auth.config WHERE key IN ('enable_anonymous_sign_ins', 'enable_signup');" || true
-          
-          # Check profiles
-          echo "🔍 Checking profiles:"
-          psql "$DB_URL" -c "SELECT user_id, display_name FROM profiles WHERE user_id IN (SELECT id FROM auth.users WHERE email LIKE 'test%@totalis.app');" || true
+          echo "⏳ Waiting 60 seconds for preview environment to stabilize..."
+          echo "   (GitHub Actions cannot connect to preview DB due to IPv6)"
+          echo "   (Trusting that Supabase has automatically seeded the database)"
+          sleep 60
 
       - name: Run integration tests against preview
         run: npm run test:integration
