@@ -1,5 +1,6 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import { getTestConfig } from '../config/test-env'
+import { ensureTestUser } from './test-setup'
 
 interface TestClients {
   serviceClient: SupabaseClient
@@ -18,6 +19,14 @@ export async function createTestClients(userEmail?: string, userPassword?: strin
   let userId: string | null = null
   
   if (userEmail && userPassword) {
+    // Ensure test user exists
+    try {
+      const testUser = await ensureTestUser(userEmail, userPassword)
+      userId = testUser.id
+    } catch (error) {
+      console.error(`Failed to ensure test user ${userEmail}:`, error)
+    }
+    
     // Create a separate client instance for user operations
     userClient = createClient(config.supabaseUrl, config.supabaseAnonKey)
     
