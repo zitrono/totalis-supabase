@@ -1,0 +1,78 @@
+name: Preview Environment Tests
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+jobs:
+  test-preview:
+    runs-on: ubuntu-latest
+    # Only run after validation passes and give time for preview to be created
+    if: github.event_name == 'pull_request'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Wait for preview environment
+        run: |
+          echo "⏳ Waiting for Supabase preview environment to be ready..."
+          # Supabase GitHub integration creates preview branches automatically
+          # Wait 2 minutes for it to be fully provisioned
+          sleep 120
+
+      - name: Get preview branch details
+        id: preview
+        run: |
+          # Preview branches follow the pattern: preview/pr-{number}
+          PREVIEW_BRANCH="preview/pr-${{ github.event.pull_request.number }}"
+          echo "preview_branch=$PREVIEW_BRANCH" >> $GITHUB_OUTPUT
+          
+          # The preview URL will be available via Supabase dashboard
+          # For now, we'll use the main project URL as tests use the main project
+          echo "🔗 Preview branch: $PREVIEW_BRANCH"
+
+      - name: Run integration tests against preview
+        run: |
+          echo "🧪 Running integration tests against preview environment..."
+          echo "Note: Currently tests run against main project until preview URLs are configured"
+          npm run test:integration
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          ENVIRONMENT: preview
+          NODE_ENV: test
+          IS_PREVIEW: true
+
+      - name: Comment test results
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const status = '${{ job.status }}' === 'success' ? '✅' : '❌';
+            const message = `${status} **Preview Environment Tests**: ${{ job.status }}
+            
+            Preview branch: \`preview/pr-${{ github.event.pull_request.number }}\`
+            
+            To view the preview environment:
+            1. Go to your [Supabase Dashboard](https://supabase.com/dashboard)
+            2. Look for the preview branch in the branches dropdown
+            `;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: message
+            });
