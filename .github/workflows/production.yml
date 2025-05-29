@@ -5,12 +5,6 @@ on:
     branches:
       - main
   workflow_dispatch:
-    inputs:
-      skip_backup:
-        description: 'Skip database backup (not recommended)'
-        required: false
-        default: false
-        type: boolean
 
 env:
   SUPABASE_CLI_VERSION: 2.23.8
@@ -21,9 +15,6 @@ jobs:
     environment: production
     
     steps:
-      - name: Setup WARP for IPv6 support
-        uses: fscarmen/warp-on-actions@v1.0
-        
       - name: Checkout code
         uses: actions/checkout@v4
 
@@ -40,25 +31,6 @@ jobs:
         run: |
           supabase login --token ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           supabase link --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
-
-      - name: Backup production database
-        if: ${{ !inputs.skip_backup }}
-        run: |
-          mkdir -p backups
-          BACKUP_FILE="backups/backup-$(date +%Y%m%d-%H%M%S).sql"
-          supabase db dump --db-url ${{ secrets.DATABASE_URL }} > "$BACKUP_FILE"
-          echo "Database backed up to: $BACKUP_FILE"
-          
-          # Upload backup as artifact
-          echo "BACKUP_FILE=$BACKUP_FILE" >> $GITHUB_ENV
-
-      - name: Upload database backup
-        if: ${{ !inputs.skip_backup }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: database-backup-${{ github.run_id }}
-          path: ${{ env.BACKUP_FILE }}
-          retention-days: 30
 
       - name: Apply migrations to production
         run: |
