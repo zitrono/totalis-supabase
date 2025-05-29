@@ -85,6 +85,9 @@ DECLARE
   default_coach_id UUID;
   existing_user_id UUID;
 BEGIN
+  -- Temporarily disable the trigger that creates profiles automatically
+  ALTER TABLE auth.users DISABLE TRIGGER on_auth_user_created;
+  
   -- Get default coach ID
   SELECT id INTO default_coach_id FROM coaches WHERE name = 'Daniel' LIMIT 1;
   
@@ -137,11 +140,13 @@ BEGIN
         updated_at
       ) VALUES (
         gen_random_uuid(),
-        test_user_id,
+        'test' || i || '@totalis.app',  -- provider_id should be the email for email provider
         test_user_id,
         jsonb_build_object(
           'sub', test_user_id::text,
-          'email', 'test' || i || '@totalis.app'
+          'email', 'test' || i || '@totalis.app',
+          'email_verified', true,
+          'provider', 'email'
         ),
         'email',
         NOW(),
@@ -183,6 +188,9 @@ BEGIN
       );
     END IF;
   END LOOP;
+  
+  -- Re-enable the trigger
+  ALTER TABLE auth.users ENABLE TRIGGER on_auth_user_created;
 END $$;
 
 -- Grant necessary permissions for anonymous users
