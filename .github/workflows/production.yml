@@ -64,16 +64,27 @@ jobs:
           for function_dir in supabase/functions/*/; do
             if [ -d "$function_dir" ] && [ -f "$function_dir/index.ts" ]; then
               function_name=$(basename "$function_dir")
-              echo "Deploying function: $function_name"
-              supabase functions deploy "$function_name" \
-                --use-api \
-                --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+              # Skip _shared directory as it's not a function
+              if [ "$function_name" != "_shared" ]; then
+                echo "Deploying function: $function_name"
+                supabase functions deploy "$function_name" \
+                  --use-api \
+                  --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+              fi
             fi
           done
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+
+      - name: Delete orphaned Edge Functions
+        run: |
+          echo "🧹 Cleaning up orphaned edge functions..."
+          ./scripts/delete-orphaned-functions.sh
+        env:
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
       - name: Push storage configuration
         run: |
