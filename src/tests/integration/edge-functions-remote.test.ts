@@ -35,7 +35,7 @@ describe('Edge Functions Remote Integration Tests', () => {
     // Use pre-created test user to avoid rate limits
     console.log('🔐 Signing in with pre-created test user...')
     const { data: authData, error } = await supabase.auth.signInWithPassword({
-      email: 'test3@totalis.test',
+      email: 'test3@totalis.app',
       password: 'Test123!@#'
     })
     

@@ -104,7 +104,7 @@ describe('SDK Operations - Priority 1 Mobile Migration', () => {
     describe('Pre-created Test User Authentication', () => {
       test('should sign in with email/password', async () => {
         const testCredentials = {
-          email: 'test1@totalis.test',
+          email: 'test1@totalis.app',
           password: 'Test123!@#'
         }
         
@@ -295,7 +295,7 @@ describe('SDK Operations - Priority 1 Mobile Migration', () => {
     beforeEach(async () => {
       // Ensure authenticated
       const { data, error } = await supabase.auth.signInWithPassword({
-        email: 'test2@totalis.test',
+        email: 'test2@totalis.app',
         password: 'Test123!@#'
       })
       expect(error).toBeNull()

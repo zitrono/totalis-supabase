@@ -12,7 +12,7 @@ describe('Database Views', () => {
 
   beforeAll(async () => {
     // Get test clients
-    const clients = await createTestClients('test2@totalis.test', 'Test123!@#')
+    const clients = await createTestClients('test2@totalis.app', 'Test123!@#')
     serviceClient = clients.serviceClient
     userClient = clients.userClient
     testUserId = clients.userId!
