@@ -1,5 +1,5 @@
 -- Seed data for Totalis
--- Last updated: 2025-05-29 (testing schema generation)
+-- Last updated: 2025-05-29 (JWT-based version without auth.users access)
 
 -- Insert default coaches
 INSERT INTO coaches (name, bio, sex, is_active) VALUES
@@ -56,144 +56,48 @@ SELECT
 FROM parent_categories p
 CROSS JOIN (VALUES
   -- Physical Health subcategories
-  ('Physical Health', 'Exercise', 'Exercise', 'Regular physical activity and fitness', 110, '#66BB6A', '#81C784'),
-  ('Physical Health', 'Nutrition', 'Nutrition', 'Healthy eating habits and dietary choices', 120, '#8BC34A', '#AED581'),
-  ('Physical Health', 'Sleep', 'Sleep', 'Quality rest and sleep hygiene', 130, '#689F38', '#9CCC65'),
+  ('Exercise', 'Exercise', 'Regular physical activity and fitness routines', 110, '#66BB6A', '#81C784'),
+  ('Nutrition', 'Nutrition', 'Healthy eating habits and dietary choices', 120, '#43A047', '#66BB6A'),
+  ('Sleep', 'Sleep', 'Quality rest and sleep hygiene', 130, '#388E3C', '#4CAF50'),
   
   -- Mental Health subcategories
-  ('Mental Health', 'Mindfulness', 'Mindfulness', 'Present-moment awareness and meditation', 210, '#42A5F5', '#64B5F6'),
-  ('Mental Health', 'Stress Management', 'Stress', 'Techniques for managing stress and anxiety', 220, '#1E88E5', '#42A5F5'),
-  ('Mental Health', 'Emotional Balance', 'Emotions', 'Understanding and regulating emotions', 230, '#1976D2', '#2196F3'),
+  ('Mindfulness', 'Mindful', 'Present-moment awareness and meditation practices', 210, '#42A5F5', '#64B5F6'),
+  ('Stress Management', 'Stress', 'Techniques for handling life''s pressures', 220, '#1E88E5', '#42A5F5'),
+  ('Emotional Balance', 'Emotions', 'Understanding and managing your emotions', 230, '#1976D2', '#2196F3'),
   
   -- Social Wellness subcategories
-  ('Social Wellness', 'Relationships', 'Relations', 'Building healthy relationships', 310, '#FFA726', '#FFB74D'),
-  ('Social Wellness', 'Communication', 'Communicate', 'Effective communication skills', 320, '#FF9800', '#FFA726'),
-  ('Social Wellness', 'Community', 'Community', 'Engaging with your community', 330, '#F57C00', '#FF9800'),
+  ('Relationships', 'Relations', 'Building and maintaining healthy relationships', 310, '#FFB74D', '#FFCC80'),
+  ('Community', 'Community', 'Engaging with your local and online communities', 320, '#FF9800', '#FFB74D'),
+  ('Communication', 'Comm', 'Effective interpersonal communication skills', 330, '#F57C00', '#FF9800'),
   
   -- Personal Growth subcategories
-  ('Personal Growth', 'Learning', 'Learning', 'Continuous learning and education', 410, '#AB47BC', '#BA68C8'),
-  ('Personal Growth', 'Productivity', 'Productive', 'Time management and efficiency', 420, '#9C27B0', '#AB47BC'),
-  ('Personal Growth', 'Creativity', 'Creative', 'Expressing yourself creatively', 430, '#8E24AA', '#9C27B0')
-) AS c(parent_name, name, name_short, description, sort_order, primary_color, secondary_color)
-WHERE p.name = c.parent_name
+  ('Learning', 'Learning', 'Continuous education and skill development', 410, '#BA68C8', '#CE93D8'),
+  ('Career', 'Career', 'Professional development and work-life balance', 420, '#9C27B0', '#BA68C8'),
+  ('Creativity', 'Creative', 'Expressing yourself through creative pursuits', 430, '#8E24AA', '#AB47BC')
+) AS c(name, name_short, description, sort_order, primary_color, secondary_color)
+WHERE 
+  (p.name = 'Physical Health' AND c.name IN ('Exercise', 'Nutrition', 'Sleep')) OR
+  (p.name = 'Mental Health' AND c.name IN ('Mindfulness', 'Stress Management', 'Emotional Balance')) OR
+  (p.name = 'Social Wellness' AND c.name IN ('Relationships', 'Community', 'Communication')) OR
+  (p.name = 'Personal Growth' AND c.name IN ('Learning', 'Career', 'Creativity'))
 ON CONFLICT DO NOTHING;
 
--- Create test users for preview environments
--- These users will only exist in preview branches, not in production
-DO $$
-DECLARE
-  test_user_id UUID;
-  default_coach_id UUID;
-  existing_user_id UUID;
-BEGIN
-  -- Temporarily disable the trigger that creates profiles automatically
-  ALTER TABLE auth.users DISABLE TRIGGER on_auth_user_created;
-  
-  -- Get default coach ID
-  SELECT id INTO default_coach_id FROM coaches WHERE name = 'Daniel' LIMIT 1;
-  
-  -- Create test users
-  FOR i IN 1..5 LOOP
-    -- Check if user already exists
-    SELECT id INTO existing_user_id 
-    FROM auth.users 
-    WHERE email = 'test' || i || '@totalis.app';
-    
-    IF existing_user_id IS NULL THEN
-      test_user_id := gen_random_uuid();
-      
-      -- Insert user into auth.users
-      INSERT INTO auth.users (
-        instance_id,
-        id,
-        aud,
-        role,
-        email,
-        encrypted_password,
-        email_confirmed_at,
-        raw_app_meta_data,
-        raw_user_meta_data,
-        created_at,
-        updated_at
-      ) VALUES (
-        '00000000-0000-0000-0000-000000000000',
-        test_user_id,
-        'authenticated',
-        'authenticated',
-        'test' || i || '@totalis.app',
-        crypt('Test123!@#', gen_salt('bf')),
-        NOW(),
-        '{"provider":"email","providers":["email"]}',
-        '{"test_account":true}',
-        NOW(),
-        NOW()
-      );
-      
-      -- Create identity for the user (required for auth to work properly)
-      INSERT INTO auth.identities (
-        id,
-        provider_id,
-        user_id,
-        identity_data,
-        provider,
-        last_sign_in_at,
-        created_at,
-        updated_at
-      ) VALUES (
-        gen_random_uuid(),
-        'test' || i || '@totalis.app',  -- provider_id should be the email for email provider
-        test_user_id,
-        jsonb_build_object(
-          'sub', test_user_id::text,
-          'email', 'test' || i || '@totalis.app',
-          'email_verified', true,
-          'provider', 'email'
-        ),
-        'email',
-        NOW(),
-        NOW(),
-        NOW()
-      );
-      
-      -- Create profile for the user
-      INSERT INTO public.profiles (
-        id,
-        coach_id,
-        metadata
-      ) VALUES (
-        test_user_id,
-        default_coach_id,
-        jsonb_build_object(
-          'test_account', true,
-          'permanent', true,
-          'created_at', NOW()
-        )
-      );
-    ELSE
-      -- User exists, make sure profile exists too
-      INSERT INTO public.profiles (
-        id,
-        coach_id,
-        metadata
-      ) 
-      SELECT 
-        existing_user_id,
-        default_coach_id,
-        jsonb_build_object(
-          'test_account', true,
-          'permanent', true,
-          'created_at', NOW()
-        )
-      WHERE NOT EXISTS (
-        SELECT 1 FROM public.profiles WHERE id = existing_user_id
-      );
-    END IF;
-  END LOOP;
-  
-  -- Re-enable the trigger
-  ALTER TABLE auth.users ENABLE TRIGGER on_auth_user_created;
-END $$;
+-- Create test user profiles without touching auth.users
+-- Note: In preview branches, test users should be created via the Supabase Auth API
+-- or by using the create_profile_if_needed() function after authentication
 
--- Grant necessary permissions for anonymous users
-GRANT USAGE ON SCHEMA public TO anon;
-GRANT SELECT ON coaches, categories, app_config TO anon;
+-- Insert sample messages for documentation purposes only
+-- These would normally be created by authenticated users
+INSERT INTO system_logs (log_level, component, message, metadata) VALUES
+  ('info', 'seed', 'Seed data applied successfully', jsonb_build_object(
+    'timestamp', NOW(),
+    'coaches_count', (SELECT COUNT(*) FROM coaches),
+    'categories_count', (SELECT COUNT(*) FROM categories),
+    'note', 'Test users should be created via Auth API in preview branches'
+  ));
+
+-- Note: Previous version of seed.sql created test users directly in auth.users
+-- This is not allowed in preview branches. Instead:
+-- 1. Use Supabase Auth API to create test users
+-- 2. Call create_profile_if_needed() RPC function after auth
+-- 3. Or use service role key for testing
