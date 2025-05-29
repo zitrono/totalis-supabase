@@ -367,12 +367,12 @@ async function completeCheckin(supabase: any, userId: string, body: CheckinReque
   let wellnessLevel = 5 // Default
   if (answers && answers.length > 0) {
     const numericAnswers = answers
-      .map(a => a.answer?.value)
-      .filter(v => typeof v === 'number')
+      .map((a: any) => a.answer?.value)
+      .filter((v: any) => typeof v === 'number')
     
     if (numericAnswers.length > 0) {
       wellnessLevel = Math.round(
-        numericAnswers.reduce((sum, val) => sum + val, 0) / numericAnswers.length
+        numericAnswers.reduce((sum: number, val: number) => sum + val, 0) / numericAnswers.length
       )
     }
   }
