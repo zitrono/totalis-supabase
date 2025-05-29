@@ -37,7 +37,6 @@ jobs:
       - name: Get preview branch credentials
         uses: 0xbigboss/supabase-branch-gh-action@v1.0.2
         id: supabase-branch
-        continue-on-error: true
         with:
           supabase-access-token: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           supabase-project-id: ${{ secrets.SUPABASE_PROJECT_ID }}
@@ -45,7 +44,6 @@ jobs:
           branch-name: ${{ github.head_ref }}
 
       - name: Display preview info
-        if: steps.supabase-branch.outcome == 'success'
         run: |
           echo "🎯 Preview Environment Details:"
           echo "   API URL: ${{ steps.supabase-branch.outputs.api_url }}"
@@ -54,27 +52,16 @@ jobs:
           echo ""
           echo "✅ Preview environment is ready for testing!"
 
-      - name: Fallback info
-        if: steps.supabase-branch.outcome != 'success'
-        run: |
-          echo "⚠️  Could not automatically get preview credentials"
-          echo "   Falling back to main project for testing"
-          echo ""
-          echo "   This might be because:"
-          echo "   - The preview branch is still being created"
-          echo "   - The third-party action needs updating"
-          echo "   - Access token permissions"
-
-      - name: Run integration tests
+      - name: Run integration tests against preview
         run: npm run test:integration
         env:
-          SUPABASE_URL: ${{ steps.supabase-branch.outputs.api_url || secrets.SUPABASE_URL }}
-          SUPABASE_ANON_KEY: ${{ steps.supabase-branch.outputs.anon_key || secrets.SUPABASE_ANON_KEY }}
-          SUPABASE_SERVICE_KEY: ${{ steps.supabase-branch.outputs.service_role_key || secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          DATABASE_URL: ${{ steps.supabase-branch.outputs.api_url && format('postgresql://postgres:{0}@{1}:{2}/postgres', steps.supabase-branch.outputs.db_pass, steps.supabase-branch.outputs.db_host, steps.supabase-branch.outputs.db_port) || secrets.DATABASE_URL }}
+          SUPABASE_URL: ${{ steps.supabase-branch.outputs.api_url }}
+          SUPABASE_ANON_KEY: ${{ steps.supabase-branch.outputs.anon_key }}
+          SUPABASE_SERVICE_KEY: ${{ steps.supabase-branch.outputs.service_role_key }}
+          DATABASE_URL: postgresql://postgres:${{ steps.supabase-branch.outputs.db_pass }}@${{ steps.supabase-branch.outputs.db_host }}:${{ steps.supabase-branch.outputs.db_port }}/postgres
           ENVIRONMENT: preview
           NODE_ENV: test
-          IS_PREVIEW: ${{ steps.supabase-branch.outcome == 'success' }}
+          IS_PREVIEW: true
 
       - name: Comment test results
         if: always()
@@ -86,21 +73,18 @@ jobs:
             
             let message = `${status} **Preview Environment Tests**: ${{ job.status }}\n\n`;
             
-            if (previewUrl) {
-              message += `🎯 **Tests ran against preview environment**\n`;
-              message += `   Preview URL: \`${previewUrl}\`\n`;
-              message += `   Branch: \`${{ github.head_ref }}\`\n\n`;
-              
-              if ('${{ job.status }}' === 'success') {
-                message += `All integration tests passed against the preview environment! 🎉`;
-              }
+            message += `🎯 **Tests ran against preview environment**\n`;
+            message += `   Preview URL: \`${previewUrl}\`\n`;
+            message += `   Branch: \`${{ github.head_ref }}\`\n\n`;
+            
+            if ('${{ job.status }}' === 'success') {
+              message += `All integration tests passed against the preview environment! 🎉`;
             } else if ('${{ steps.wait-for-preview.outcome }}' === 'failure') {
-              message += `⚠️ **Preview environment not ready**\n\n`;
-              message += `The Supabase preview branch is still being created. This is normal for new PRs.\n`;
-              message += `Please wait a few minutes and re-run the workflow.`;
-            } else {
-              message += `❌ **Could not access preview environment**\n\n`;
-              message += `This might be due to missing credentials or configuration issues.`;
+              message += `❌ **Preview environment not ready**\n\n`;
+              message += `The Supabase preview branch is still being created. Please wait a few minutes and re-run the workflow.`;
+            } else if (!previewUrl) {
+              message += `❌ **Could not get preview credentials**\n\n`;
+              message += `Failed to retrieve preview branch credentials. Check the workflow logs for details.`;
             }
             
             try {

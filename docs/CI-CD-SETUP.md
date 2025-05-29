@@ -61,7 +61,7 @@ Our CI/CD pipeline uses the Supabase GitHub Integration to automatically create 
   2. Automatically gets preview branch credentials
   3. Runs integration tests against preview
   4. Comments results on PR
-- **Fallback**: If preview credentials can't be obtained, tests run against main project
+- **Requirements**: Preview environment must be ready and accessible
 
 ### 4. `production.yml` - Production Deployment
 - **Triggers**: On push to `main` branch
@@ -119,8 +119,9 @@ Our CI/CD pipeline uses the Supabase GitHub Integration to automatically create 
 
 ### Can't Get Preview Credentials
 - The third-party action might need updating
-- Fallback to main project testing is automatic
 - Check SUPABASE_ACCESS_TOKEN has correct permissions
+- Ensure the preview branch exists in Supabase dashboard
+- Verify the branch name matches the PR branch
 
 ## Future Improvements
 
