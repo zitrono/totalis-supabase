@@ -4,9 +4,8 @@ import { getTestConfig } from '../config/test-env'
 const config = getTestConfig()
 const supabase = createClient(config.supabaseUrl, config.supabaseServiceKey)
 
-// Skip anonymous tests in environments where anonymous sign-ins might not be enabled
-// (e.g., preview branches don't inherit auth settings)
-const testOrSkip = config.isPreview ? test.skip : test
+// Anonymous sign-ins are now enabled via config.toml for all environments
+const testOrSkip = test
 
 describe('Anonymous User RLS Restrictions', () => {
   describe('Anonymous user access control', () => {
