@@ -41,12 +41,22 @@ export async function setupTestUsers(): Promise<void> {
   ]
   
   for (const coach of coachesData) {
-    const { error: coachUpsertError } = await adminClient
+    // First check if coach exists
+    const { data: existingCoach } = await adminClient
       .from('coaches')
-      .upsert(coach, { onConflict: 'name' })
+      .select('id')
+      .eq('name', coach.name)
+      .single()
     
-    if (coachUpsertError) {
-      console.error(`Failed to upsert coach ${coach.name}:`, coachUpsertError)
+    if (!existingCoach) {
+      // Insert if doesn't exist
+      const { error: coachInsertError } = await adminClient
+        .from('coaches')
+        .insert(coach)
+      
+      if (coachInsertError) {
+        console.error(`Failed to insert coach ${coach.name}:`, coachInsertError)
+      }
     }
   }
   
@@ -60,9 +70,23 @@ export async function setupTestUsers(): Promise<void> {
   ]
   
   for (const category of categoriesData) {
-    await adminClient
+    // First check if category exists
+    const { data: existingCategory } = await adminClient
       .from('categories')
-      .upsert(category, { onConflict: 'name' })
+      .select('id')
+      .eq('name', category.name)
+      .single()
+    
+    if (!existingCategory) {
+      // Insert if doesn't exist
+      const { error: categoryInsertError } = await adminClient
+        .from('categories')
+        .insert(category)
+      
+      if (categoryInsertError) {
+        console.error(`Failed to insert category ${category.name}:`, categoryInsertError)
+      }
+    }
   }
   
   // Get default coach ID
