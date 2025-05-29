@@ -1,4 +1,5 @@
 -- Seed data for Totalis
+-- Last updated: 2025-05-29 (testing schema generation)
 
 -- Insert default coaches
 INSERT INTO coaches (name, bio, sex, is_active) VALUES
