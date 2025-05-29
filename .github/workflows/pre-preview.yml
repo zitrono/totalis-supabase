@@ -176,15 +176,7 @@ jobs:
             - ✓ No hardcoded secrets
             - ✓ Required files present
             
-            You can now manually trigger the preview environment deployment by:
-            1. Going to the [Actions tab](https://github.com/${{ github.repository }}/actions)
-            2. Select 'Deploy Preview Environment'
-            3. Click 'Run workflow' and select this PR
-            
-            Or use the GitHub CLI:
-            \`\`\`bash
-            gh workflow run preview.yml -f pr_number=${{ github.event.pull_request.number }}
-            \`\`\`" || echo "Note: Could not post PR comment (insufficient permissions)"
+            The Supabase preview environment will be created automatically." || echo "Note: Could not post PR comment (insufficient permissions)"
         env:
           GH_TOKEN: ${{ github.token }}
 
@@ -197,7 +189,7 @@ jobs:
           gh pr comment ${{ github.event.pull_request.number }} \
             --body "❌ **Pre-preview validation failed!**
             
-            Please fix the validation errors above before a preview environment can be created.
+            Please fix the validation errors above.
             
             Once fixed, push your changes and validation will run again automatically." || echo "Note: Could not post PR comment (insufficient permissions)"
         env:

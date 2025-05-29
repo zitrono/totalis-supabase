@@ -77,6 +77,8 @@ enable_refresh_token_rotation = true
 refresh_token_reuse_interval = 10
 # Allow/disallow new user signups to your project.
 enable_signup = true
+# Enable anonymous sign-ins for testing
+enable_anonymous_sign_ins = true
 
 [auth.email]
 # Allow/disallow new user signups via email to your project.
@@ -133,3 +135,14 @@ s3_host = "env(S3_HOST)"
 s3_region = "env(S3_REGION)"
 s3_access_key = "env(S3_ACCESS_KEY)"
 s3_secret_key = "env(S3_SECRET_KEY)"
+
+# Edge Functions Configuration
+# These functions will be automatically deployed to preview branches
+[functions.checkin]
+verify_jwt = true
+
+[functions.chat-ai-response]
+verify_jwt = true
+
+[functions.transcribe-audio]
+verify_jwt = true

@@ -114,3 +114,38 @@ export function trackMetric(
 export function isMonitoringEnabled(): boolean {
   return !!(Deno.env.get('SENTRY_DSN') || Deno.env.get('POSTHOG_API_KEY'))
 }
+
+// Create monitoring context for a request
+export function createMonitoringContext(functionName: string, metadata?: any) {
+  return {
+    functionName,
+    metadata,
+    timestamp: new Date().toISOString(),
+    trackStart: (userId?: string, data?: any) => {
+      trackEvent(`${functionName}.start`, { 
+        userId, 
+        ...data, 
+        ...metadata 
+      })
+    },
+    trackSuccess: (userIdOrData?: any, additionalData?: any) => {
+      // Handle both trackSuccess(data) and trackSuccess(userId, data) patterns
+      let eventData: any = {}
+      if (typeof userIdOrData === 'string') {
+        eventData.userId = userIdOrData
+        eventData = { ...eventData, ...additionalData }
+      } else {
+        eventData = userIdOrData || {}
+      }
+      trackEvent(`${functionName}.success`, { ...eventData, ...metadata })
+    },
+    trackError: (error: Error | string) => {
+      const err = error instanceof Error ? error : new Error(String(error))
+      captureError(err, { functionName, ...metadata })
+      trackEvent(`${functionName}.error`, { 
+        error: err.message, 
+        ...metadata 
+      })
+    }
+  }
+}

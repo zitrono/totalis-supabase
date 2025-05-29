@@ -5,10 +5,9 @@ import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
 import { corsHeaders } from '../_shared/cors.ts'
 import { createMonitoringContext } from '../_shared/monitoring.ts'
-import { extractTestMetadata } from '../_shared/test-data.ts'
+import { getTestMetadata, mergeTestMetadata } from '../_shared/test-data.ts'
 
-const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY')
-const MAX_FILE_SIZE = 25 * 1024 * 1024 // 25MB limit per OpenAI
+const MAX_FILE_SIZE = 25 * 1024 * 1024 // 25MB
 
 serve(async (req) => {
   // Handle CORS
@@ -16,23 +15,29 @@ serve(async (req) => {
     return new Response('ok', { headers: corsHeaders })
   }
 
-  // Extract test metadata
-  const testMetadata = extractTestMetadata(req)
-  const monitoring = createMonitoringContext('audio-transcribe', testMetadata)
-  
+  const monitoring = createMonitoringContext('audio-transcribe')
+
   try {
+    // Track function start
+    monitoring.trackStart()
 
     // Get auth header
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
-      throw new Error('No authorization header')
+      return new Response(
+        JSON.stringify({ error: 'Authorization required' }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 401
+        }
+      )
     }
 
-    // Create Supabase client with service key for auth verification
+    // Create Supabase client
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      { 
+      {
         global: { headers: { Authorization: authHeader } },
         auth: {
           autoRefreshToken: false,
@@ -40,13 +45,16 @@ serve(async (req) => {
         }
       }
     )
-    
-    // Get authenticated user - extract token from header
+
+    // Get authenticated user
     const token = authHeader.replace('Bearer ', '')
     const { data: { user }, error: userError } = await supabase.auth.getUser(token)
     if (userError || !user) {
       throw new Error('Invalid authentication')
     }
+
+    // Get test metadata
+    const testMetadata = getTestMetadata(req)
 
     // Parse multipart form data
     const formData = await req.formData()
@@ -62,70 +70,113 @@ serve(async (req) => {
     }
 
     // Validate file type
-    const allowedTypes = ['audio/mp3', 'audio/wav', 'audio/m4a', 'audio/ogg', 'audio/webm', 'audio/mpeg']
-    if (!allowedTypes.includes(audioFile.type)) {
+    const allowedTypes = ['audio/mp3', 'audio/wav', 'audio/m4a', 'audio/ogg', 'audio/webm', 'audio/mpeg', 'application/octet-stream']
+    if (!allowedTypes.includes(audioFile.type) && !audioFile.type.startsWith('audio/')) {
       throw new Error(`Invalid file type: ${audioFile.type}`)
     }
 
-    // Generate unique filename
-    const timestamp = new Date().toISOString()
-    const filename = `${user.id}/${timestamp}-${audioFile.name}`
+    // Get OpenAI API key
+    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY')
+    if (!OPENAI_API_KEY) {
+      // Return mock transcription if no API key
+      const mockTranscription = {
+        text: `[Mock transcription of ${audioFile.name}]`,
+        duration: 0,
+        language: 'en'
+      }
 
-    // Upload to Supabase Storage
-    const arrayBuffer = await audioFile.arrayBuffer()
-    const { error: uploadError } = await supabase.storage
-      .from('voice-recordings')
-      .upload(filename, arrayBuffer, {
-        contentType: audioFile.type,
-        upsert: false
-      })
+      // Store transcription record without file storage
+      const { data: record, error: dbError } = await supabase
+        .from('audio_transcriptions')
+        .insert({
+          user_id: user.id,
+          transcription: mockTranscription.text,
+          duration: mockTranscription.duration,
+          language: mockTranscription.language,
+          metadata: mergeTestMetadata({
+            file_size: audioFile.size,
+            file_type: audioFile.type,
+            file_name: audioFile.name,
+            mock: true
+          }, testMetadata)
+        })
+        .select()
+        .single()
 
-    if (uploadError) {
-      throw new Error(`Failed to upload audio: ${uploadError.message}`)
+      if (dbError) {
+        throw new Error(`Failed to save transcription: ${dbError.message}`)
+      }
+
+      // Track success
+      monitoring.trackSuccess(user.id, { mock: true, fileSize: audioFile.size })
+
+      return new Response(
+        JSON.stringify({
+          id: record.id,
+          transcription: mockTranscription.text,
+          duration: mockTranscription.duration,
+          language: mockTranscription.language,
+          created_at: record.created_at
+        }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200
+        }
+      )
     }
 
-    // TODO: Call OpenAI Whisper API for transcription
-    // For now, return mock transcription
-    const transcription = {
-      text: `[Mock transcription of ${audioFile.name}]`,
-      duration: 0,
-      language: 'en'
+    // Convert audio file to form data for OpenAI
+    const openAIFormData = new FormData()
+    openAIFormData.append('file', audioFile)
+    openAIFormData.append('model', 'whisper-1')
+    openAIFormData.append('language', 'en') // Optional: specify language
+
+    // Call OpenAI Whisper API
+    const openAIResponse = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${OPENAI_API_KEY}`
+      },
+      body: openAIFormData
+    })
+
+    if (!openAIResponse.ok) {
+      const error = await openAIResponse.text()
+      throw new Error(`OpenAI API error: ${error}`)
     }
+
+    const transcriptionResult = await openAIResponse.json()
 
     // Store transcription record
     const { data: record, error: dbError } = await supabase
       .from('audio_transcriptions')
       .insert({
         user_id: user.id,
-        filename: filename,
-        transcription: transcription.text,
-        duration: transcription.duration,
-        language: transcription.language,
-        metadata: {
-          test: req.headers.get('X-Test-Mode') === 'true',
-          test_run_id: req.headers.get('X-Test-Run-ID'),
+        transcription: transcriptionResult.text,
+        duration: transcriptionResult.duration || 0,
+        language: transcriptionResult.language || 'en',
+        metadata: mergeTestMetadata({
           file_size: audioFile.size,
-          file_type: audioFile.type
-        }
+          file_type: audioFile.type,
+          file_name: audioFile.name
+        }, testMetadata)
       })
       .select()
       .single()
 
     if (dbError) {
-      // Try to clean up uploaded file
-      await supabase.storage.from('voice-recordings').remove([filename])
       throw new Error(`Failed to save transcription: ${dbError.message}`)
     }
 
     // Track success
-    monitoring.trackSuccess(user.id, { transcriptionLength: transcription.text.length })
+    monitoring.trackSuccess(user.id, { transcriptionLength: transcriptionResult.text.length })
 
     return new Response(
       JSON.stringify({
         id: record.id,
-        transcription: transcription.text,
-        duration: transcription.duration,
-        language: transcription.language,
+        transcription: transcriptionResult.text,
+        duration: transcriptionResult.duration || 0,
+        language: transcriptionResult.language || 'en',
         created_at: record.created_at
       }),
       { 

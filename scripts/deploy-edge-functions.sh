@@ -101,8 +101,11 @@ main() {
         for function_dir in supabase/functions/*/; do
             if [ -d "$function_dir" ] && [ -f "$function_dir/index.ts" ]; then
                 function_name=$(basename "$function_dir")
-                deploy_function "$function_name"
-                echo ""
+                # Skip _shared directory as it's not a function
+                if [ "$function_name" != "_shared" ]; then
+                    deploy_function "$function_name"
+                    echo ""
+                fi
             fi
         done
         

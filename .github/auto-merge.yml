@@ -1,0 +1,53 @@
+# Auto-merge Configuration
+
+# Enable auto-merge for all PRs by default
+enabled: true
+
+# Merge method: squash, merge, or rebase
+merge_method: squash
+
+# Required checks that must pass before auto-merge
+required_checks:
+  - "Fast Static Validation"
+  - "validate-migrations"
+  - "validate-functions"
+  - "validate-config"
+  - "run-integration-tests"
+  - "test-preview"
+
+# Labels that prevent auto-merge
+block_labels:
+  - "do-not-merge"
+  - "work-in-progress"
+  - "needs-review"
+  - "breaking-change"
+
+# Labels that enable auto-merge (if specified, ONLY these PRs will auto-merge)
+# allow_labels:
+#   - "auto-merge"
+#   - "dependencies"
+
+# Users whose PRs should always auto-merge
+# trusted_authors:
+#   - "dependabot[bot]"
+#   - "renovate[bot]"
+
+# Paths that should NOT trigger auto-merge
+exclude_paths:
+  - ".github/workflows/production.yml"
+  - "supabase/migrations/*_hf_*.sql" # Hotfix migrations
+  - "*.md" # Documentation changes
+
+# Maximum PR size (lines changed) for auto-merge
+max_changes: 500
+
+# Whether to delete branch after merge
+delete_branch_on_merge: true
+
+# Comment to add before merging
+merge_comment: |
+  🤖 **Auto-merged by CI/CD**
+  
+  All required checks passed. Merging automatically.
+  
+  If this was unexpected, you can revert this merge or disable auto-merge by adding the `do-not-merge` label to future PRs.

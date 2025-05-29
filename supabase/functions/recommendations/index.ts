@@ -4,7 +4,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
 import { corsHeaders } from "../_shared/cors.ts"
-import { extractTestMetadata, mergeTestMetadata } from "../_shared/test-data.ts"
+import { getTestMetadata, mergeTestMetadata } from "../_shared/test-data.ts"
 import { createMonitoringContext } from "../_shared/monitoring.ts"
 
 serve(async (req) => {
@@ -13,7 +13,7 @@ serve(async (req) => {
     return new Response('ok', { headers: corsHeaders })
   }
 
-  const testMetadata = extractTestMetadata(req)
+  const testMetadata = getTestMetadata(req)
   const monitoring = createMonitoringContext('recommendations', testMetadata)
   
   try {

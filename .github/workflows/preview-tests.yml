@@ -1,0 +1,168 @@
+name: Preview Environment Tests
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+jobs:
+  test-preview:
+    runs-on: ubuntu-latest
+    # Only run after validation passes and give time for preview to be created
+    if: github.event_name == 'pull_request'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Wait for Supabase Preview to be ready
+        uses: fountainhead/action-wait-for-check@v1.2.0
+        id: wait-for-preview
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          checkName: 'Supabase Preview'
+          ref: ${{ github.event.pull_request.head.sha }}
+          timeoutSeconds: 300
+          intervalSeconds: 15
+
+      - name: Get preview branch credentials
+        uses: 0xbigboss/supabase-branch-gh-action@v1
+        id: supabase-branch
+        with:
+          supabase-access-token: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          supabase-project-id: ${{ secrets.SUPABASE_PROJECT_ID }}
+          wait-for-migrations: false
+          timeout: 120
+
+      - name: Display preview info
+        run: |
+          echo "🎯 Preview Environment Details:"
+          echo "   API URL: ${{ steps.supabase-branch.outputs.api_url }}"
+          echo "   DB Host: ${{ steps.supabase-branch.outputs.db_host }}"
+          echo "   Branch: ${{ github.head_ref }}"
+          echo ""
+          echo "📋 All outputs:"
+          echo "   ref: ${{ steps.supabase-branch.outputs.ref }}"
+          echo "   api_url: ${{ steps.supabase-branch.outputs.api_url }}"
+          echo "   graphql_url: ${{ steps.supabase-branch.outputs.graphql_url }}"
+          echo "   db_host: ${{ steps.supabase-branch.outputs.db_host }}"
+          echo "   db_port: ${{ steps.supabase-branch.outputs.db_port }}"
+          echo "   db_user: ${{ steps.supabase-branch.outputs.db_user }}"
+          echo "   db_password: [REDACTED]"
+          echo "   jwt_secret: [REDACTED]"
+          echo "   anon_key: [REDACTED]"
+          echo "   service_role_key: [REDACTED]"
+          echo ""
+          echo "⚠️  Note: GitHub Actions doesn't support IPv6, cannot connect directly to DB"
+          echo "✅ Preview environment is ready for testing!"
+
+      - name: Construct preview URL
+        id: preview-url
+        run: |
+          # Extract base URL from api_url by removing /rest/v1
+          API_URL="${{ steps.supabase-branch.outputs.api_url }}"
+          BASE_URL="${API_URL%/rest/v1}"
+          echo "base_url=$BASE_URL" >> $GITHUB_OUTPUT
+          echo "Constructed base URL: $BASE_URL"
+
+      - name: Setup Supabase CLI
+        run: |
+          # Download to tmp directory to avoid conflicts
+          cd /tmp
+          wget -qO- https://github.com/supabase/cli/releases/download/v2.23.8/supabase_linux_amd64.tar.gz | tar xvz
+          sudo mv supabase /usr/local/bin/
+          cd $GITHUB_WORKSPACE
+          supabase --version
+
+      - name: Inject secrets (non-blocking)
+        run: |
+          # Extract project ref from preview URL
+          PREVIEW_API_URL="${{ steps.supabase-branch.outputs.api_url }}"
+          PREVIEW_PROJECT_REF=$(echo $PREVIEW_API_URL | grep -oP '(?<=https://)[^.]+')
+          echo "Preview project ref: $PREVIEW_PROJECT_REF"
+          
+          # Run secrets injection in background - doesn't block workflow
+          (
+            echo "🔐 Starting secrets injection in background..."
+            
+            # Login and link to preview project
+            supabase login --token ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+            supabase link --project-ref $PREVIEW_PROJECT_REF
+            
+            # Create temporary .env file with secrets
+            cat > supabase/.env.preview <<EOF
+          OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+          EOF
+            
+            # Push secrets to preview branch
+            supabase secrets set --env-file supabase/.env.preview --project-ref $PREVIEW_PROJECT_REF
+            
+            # Clean up temp file
+            rm -f supabase/.env.preview
+            
+            echo "✅ Secrets injection completed"
+          ) &
+
+      - name: Wait for preview environment to stabilize
+        run: |
+          echo "⏳ Waiting 60 seconds for preview environment to stabilize..."
+          echo "   - Edge functions are being deployed automatically via config.toml"
+          echo "   - Secrets are being injected in parallel"
+          echo "   - Database is being seeded with test data"
+          sleep 60
+          echo "✅ Preview environment should be ready!"
+
+      - name: Run integration tests against preview
+        run: npm run test:integration
+        env:
+          SUPABASE_URL: ${{ steps.preview-url.outputs.base_url }}
+          SUPABASE_ANON_KEY: ${{ steps.supabase-branch.outputs.anon_key }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ steps.supabase-branch.outputs.service_role_key }}
+          DATABASE_URL: postgresql://postgres:${{ steps.supabase-branch.outputs.db_password }}@${{ steps.supabase-branch.outputs.db_host }}:${{ steps.supabase-branch.outputs.db_port }}/postgres
+          ENVIRONMENT: preview
+          NODE_ENV: test
+          IS_PREVIEW: true
+
+      - name: Comment test results
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const status = '${{ job.status }}' === 'success' ? '✅' : '❌';
+            const previewUrl = '${{ steps.supabase-branch.outputs.api_url }}';
+            
+            let message = `${status} **Preview Environment Tests**: ${{ job.status }}\n\n`;
+            
+            message += `🎯 **Tests ran against preview environment**\n`;
+            message += `   Preview URL: \`${previewUrl}\`\n`;
+            message += `   Branch: \`${{ github.head_ref }}\`\n\n`;
+            
+            if ('${{ job.status }}' === 'success') {
+              message += `All integration tests passed against the preview environment! 🎉`;
+            } else if ('${{ steps.wait-for-preview.outcome }}' === 'failure') {
+              message += `❌ **Preview environment not ready**\n\n`;
+              message += `The Supabase preview branch is still being created. Please wait a few minutes and re-run the workflow.`;
+            } else if (!previewUrl) {
+              message += `❌ **Could not get preview credentials**\n\n`;
+              message += `Failed to retrieve preview branch credentials. Check the workflow logs for details.`;
+            }
+            
+            try {
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: message
+              });
+            } catch (error) {
+              console.log('Could not post comment:', error.message);
+            }

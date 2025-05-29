@@ -44,3 +44,6 @@ totalis_*.sql
 
 # GitHub Secrets
 .env.github-secrets
+
+# Deno
+deno.lock

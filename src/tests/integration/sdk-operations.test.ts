@@ -1,6 +1,8 @@
 import { describe, test, expect, beforeAll, afterAll, beforeEach } from '@jest/globals'
 import { createClient, SupabaseClient, User } from '@supabase/supabase-js'
 import { getTestConfig, logTestConfig } from '../config/test-env'
+import { createTestClients, getServiceClient } from '../helpers/test-client'
+import { setupTestUsers } from '../helpers/setup-test-users'
 import * as fs from 'fs'
 import * as path from 'path'
 
@@ -12,6 +14,11 @@ describe('SDK Operations - Priority 1 Mobile Migration', () => {
   beforeAll(async () => {
     const config = getTestConfig()
     logTestConfig(config)
+    
+    if (config.isPreview) {
+      console.log('🔧 Setting up test users for preview environment...')
+      await setupTestUsers()
+    }
     
     supabase = createClient(config.supabaseUrl, config.supabaseServiceKey, {
       auth: {
@@ -103,7 +110,7 @@ describe('SDK Operations - Priority 1 Mobile Migration', () => {
     describe('Pre-created Test User Authentication', () => {
       test('should sign in with email/password', async () => {
         const testCredentials = {
-          email: 'test1@totalis.test',
+          email: 'test1@totalis.app',
           password: 'Test123!@#'
         }
         
@@ -143,7 +150,7 @@ describe('SDK Operations - Priority 1 Mobile Migration', () => {
     beforeEach(async () => {
       // Ensure authenticated for storage operations
       const { error } = await supabase.auth.signInWithPassword({
-        email: 'test1@totalis.test',
+        email: 'test1@totalis.app',
         password: 'Test123!@#'
       })
       expect(error).toBeNull()
@@ -294,7 +301,7 @@ describe('SDK Operations - Priority 1 Mobile Migration', () => {
     beforeEach(async () => {
       // Ensure authenticated
       const { data, error } = await supabase.auth.signInWithPassword({
-        email: 'test2@totalis.test',
+        email: 'test2@totalis.app',
         password: 'Test123!@#'
       })
       expect(error).toBeNull()
@@ -305,7 +312,7 @@ describe('SDK Operations - Priority 1 Mobile Migration', () => {
       const profileData = {
         id: testUser!.id, // profiles.id references auth.users.id
         year_of_birth: 1990,
-        sex: 'non-binary',
+        sex: 'male', // Only 'male' or 'female' allowed
         notification_settings: {
           email: true,
           push: false,
@@ -324,7 +331,7 @@ describe('SDK Operations - Priority 1 Mobile Migration', () => {
       
       const { data, error } = await supabase
         .from('profiles')
-        .insert(profileData)
+        .upsert(profileData)
         .select()
         .single()
       
