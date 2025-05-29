@@ -28,29 +28,41 @@ jobs:
         run: |
           echo "⏳ Waiting for Supabase preview environment to be ready..."
           # Supabase GitHub integration creates preview branches automatically
-          # Wait 2 minutes for it to be fully provisioned
-          sleep 120
+          # Wait 3 minutes for it to be fully provisioned and edge functions deployed
+          sleep 180
 
       - name: Get preview branch details
         id: preview
         run: |
-          # Preview branches follow the pattern: preview/pr-{number}
-          PREVIEW_BRANCH="preview/pr-${{ github.event.pull_request.number }}"
-          echo "preview_branch=$PREVIEW_BRANCH" >> $GITHUB_OUTPUT
-          
-          # The preview URL will be available via Supabase dashboard
-          # For now, we'll use the main project URL as tests use the main project
-          echo "🔗 Preview branch: $PREVIEW_BRANCH"
+          echo "🔍 Getting preview branch information..."
+          # The Supabase bot comments with the preview project ID
+          # For now, we'll note that manual configuration is needed
+          echo "ℹ️  Preview branch has been created by Supabase GitHub integration"
+          echo "ℹ️  To run tests against preview, add these secrets to your repo:"
+          echo "    - PREVIEW_SUPABASE_URL"
+          echo "    - PREVIEW_SUPABASE_ANON_KEY" 
+          echo "    - PREVIEW_SUPABASE_SERVICE_KEY"
+          echo ""
+          echo "🔗 Get these values from your preview branch dashboard"
 
-      - name: Run integration tests against preview
+      - name: Run integration tests
         run: |
-          echo "🧪 Running integration tests against preview environment..."
-          echo "Note: Currently tests run against main project until preview URLs are configured"
+          # Check if preview secrets are configured
+          if [ -n "${{ secrets.PREVIEW_SUPABASE_URL }}" ]; then
+            echo "🧪 Running integration tests against preview environment..."
+            export SUPABASE_URL="${{ secrets.PREVIEW_SUPABASE_URL }}"
+            export SUPABASE_ANON_KEY="${{ secrets.PREVIEW_SUPABASE_ANON_KEY }}"
+            export SUPABASE_SERVICE_KEY="${{ secrets.PREVIEW_SUPABASE_SERVICE_KEY }}"
+          else
+            echo "⚠️  Preview secrets not configured, running against main project..."
+            echo "ℹ️  This is expected for the first PR after enabling branching"
+            export SUPABASE_URL="${{ secrets.SUPABASE_URL }}"
+            export SUPABASE_ANON_KEY="${{ secrets.SUPABASE_ANON_KEY }}"
+            export SUPABASE_SERVICE_KEY="${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}"
+          fi
+          
           npm run test:integration
         env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           ENVIRONMENT: preview
           NODE_ENV: test
           IS_PREVIEW: true
@@ -61,18 +73,30 @@ jobs:
         with:
           script: |
             const status = '${{ job.status }}' === 'success' ? '✅' : '❌';
-            const message = `${status} **Preview Environment Tests**: ${{ job.status }}
+            const usingPreview = '${{ secrets.PREVIEW_SUPABASE_URL }}' !== '';
             
-            Preview branch: \`preview/pr-${{ github.event.pull_request.number }}\`
+            let message = `${status} **Integration Tests**: ${{ job.status }}\n\n`;
             
-            To view the preview environment:
-            1. Go to your [Supabase Dashboard](https://supabase.com/dashboard)
-            2. Look for the preview branch in the branches dropdown
-            `;
+            if (usingPreview) {
+              message += `Tests ran against: Preview environment\n`;
+            } else {
+              message += `Tests ran against: Main project (preview secrets not configured)\n\n`;
+              message += `To enable preview testing:\n`;
+              message += `1. Check the Supabase bot comment above for your preview project link\n`;
+              message += `2. Get API credentials from the preview project Settings → API\n`;
+              message += `3. Add these as GitHub secrets:\n`;
+              message += `   - \`PREVIEW_SUPABASE_URL\`\n`;
+              message += `   - \`PREVIEW_SUPABASE_ANON_KEY\`\n`;
+              message += `   - \`PREVIEW_SUPABASE_SERVICE_KEY\`\n`;
+            }
             
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: message
-            });
+            try {
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: message
+              });
+            } catch (error) {
+              console.log('Could not post comment:', error.message);
+            }
