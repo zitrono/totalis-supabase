@@ -64,6 +64,11 @@ jobs:
           echo ""
           echo "✅ Preview environment is ready for testing!"
 
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
       - name: Construct preview URL
         id: preview-url
         run: |
@@ -73,17 +78,41 @@ jobs:
           echo "base_url=$BASE_URL" >> $GITHUB_OUTPUT
           echo "Constructed base URL: $BASE_URL"
 
-      - name: Verify test data exists
+      - name: Apply migrations to preview branch
         run: |
-          echo "🔍 Checking if test users exist in preview database..."
-          # Use psql to check if test users exist
-          export PGPASSWORD="${{ steps.supabase-branch.outputs.db_password }}"
-          psql "postgresql://postgres@${{ steps.supabase-branch.outputs.db_host }}:${{ steps.supabase-branch.outputs.db_port }}/postgres" \
-            -c "SELECT email, created_at FROM auth.users WHERE email LIKE 'test%@totalis.app' ORDER BY email;" || true
+          echo "🔄 Applying migrations to preview branch..."
+          supabase db push --db-url "postgresql://postgres:${{ steps.supabase-branch.outputs.db_password }}@${{ steps.supabase-branch.outputs.db_host }}:${{ steps.supabase-branch.outputs.db_port }}/postgres"
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+
+      - name: Seed preview database
+        run: |
+          echo "🌱 Seeding preview database..."
+          supabase db seed --db-url "postgresql://postgres:${{ steps.supabase-branch.outputs.db_password }}@${{ steps.supabase-branch.outputs.db_host }}:${{ steps.supabase-branch.outputs.db_port }}/postgres"
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+
+      - name: Wait for DB readiness
+        run: |
+          echo "⏳ Waiting for database to be ready..."
+          DB_URL="postgresql://postgres:${{ steps.supabase-branch.outputs.db_password }}@${{ steps.supabase-branch.outputs.db_host }}:${{ steps.supabase-branch.outputs.db_port }}/postgres"
           
-          echo "🔍 Checking auth settings..."
-          psql "postgresql://postgres@${{ steps.supabase-branch.outputs.db_host }}:${{ steps.supabase-branch.outputs.db_port }}/postgres" \
-            -c "SELECT key, value FROM auth.config WHERE key IN ('enable_anonymous_sign_ins', 'enable_signup');" || true
+          until supabase db query "SELECT 1" --db-url "$DB_URL" &> /dev/null; do
+            echo "Waiting for Postgres..."
+            sleep 1
+          done
+          
+          echo "✅ Database is ready!"
+          
+          # Verify test users exist
+          echo "🔍 Checking test users:"
+          supabase db query "SELECT email, created_at FROM auth.users WHERE email LIKE 'test%@totalis.app' ORDER BY email;" --db-url "$DB_URL"
+          
+          # Check auth settings
+          echo "🔍 Checking auth configuration:"
+          supabase db query "SELECT key, value FROM auth.config WHERE key IN ('enable_anonymous_sign_ins', 'enable_signup');" --db-url "$DB_URL" || true
 
       - name: Run integration tests against preview
         run: npm run test:integration
