@@ -193,12 +193,6 @@ BEGIN
   ALTER TABLE auth.users ENABLE TRIGGER on_auth_user_created;
 END $$;
 
--- Configure auth settings
-INSERT INTO auth.config (key, value) VALUES
-  ('enable_anonymous_sign_ins', 'true'),
-  ('enable_signup', 'true')
-ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
-
 -- Grant necessary permissions for anonymous users
 GRANT USAGE ON SCHEMA public TO anon;
 GRANT SELECT ON coaches, categories, app_config TO anon;
