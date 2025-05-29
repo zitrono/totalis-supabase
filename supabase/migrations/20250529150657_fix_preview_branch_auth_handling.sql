@@ -49,7 +49,15 @@ END;
 $$
 LANGUAGE plpgsql SECURITY DEFINER;
 
--- 3. Update check_auth_type to use JWT claims instead of querying auth.users
+-- 3. Create auth_type enum if it doesn't exist
+DO $$ 
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'auth_type') THEN
+        CREATE TYPE auth_type AS ENUM ('none', 'anon', 'permanent', 'service');
+    END IF;
+END $$;
+
+-- 4. Update check_auth_type to use JWT claims instead of querying auth.users
 CREATE OR REPLACE FUNCTION check_auth_type()
 RETURNS auth_type AS $$
 DECLARE
@@ -87,10 +95,10 @@ END;
 $$
 LANGUAGE plpgsql SECURITY DEFINER STABLE;
 
--- 4. Grant execute permission on the RPC function
+-- 5. Grant execute permission on the RPC function
 GRANT EXECUTE ON FUNCTION create_profile_if_needed() TO authenticated, anon;
 
--- 5. Create profiles for any existing users (one-time migration)
+-- 6. Create profiles for any existing users (one-time migration)
 -- This ensures existing users have profiles
 DO $$
 DECLARE
@@ -126,6 +134,6 @@ EXCEPTION
         RAISE NOTICE 'Skipping user migration due to insufficient privileges (expected in preview branches)';
 END $$;
 
--- 6. Add helpful comments
+-- 7. Add helpful comments
 COMMENT ON FUNCTION create_profile_if_needed() IS 'Creates or updates user profile using JWT claims only. Call this after authentication in your app.';
 COMMENT ON FUNCTION check_auth_type() IS 'Determines auth type from JWT claims without accessing auth.users table.';
