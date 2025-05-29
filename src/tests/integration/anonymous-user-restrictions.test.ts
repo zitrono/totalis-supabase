@@ -5,10 +5,29 @@ const config = getTestConfig()
 const supabase = createClient(config.supabaseUrl, config.supabaseServiceKey)
 
 describe('Anonymous User RLS Restrictions', () => {
-  // Skip anonymous tests in preview environments as anonymous sign-ins may not be enabled
-  const describeOrSkip = config.isPreview ? describe.skip : describe
+  let anonymousEnabled = true
   
-  describeOrSkip('Anonymous user access control', () => {
+  // Test if anonymous sign-ins are enabled
+  beforeAll(async () => {
+    const anonClient = createClient(config.supabaseUrl, config.supabaseAnonKey)
+    try {
+      const { error } = await anonClient.auth.signInAnonymously()
+      if (error?.message === 'Anonymous sign-ins are disabled') {
+        anonymousEnabled = false
+        console.log('⚠️  Anonymous sign-ins are disabled in this environment')
+      } else if (!error) {
+        // Sign out if successful
+        await anonClient.auth.signOut()
+      }
+    } catch (e) {
+      anonymousEnabled = false
+    }
+  })
+  
+  // Skip anonymous tests if anonymous sign-ins are disabled
+  const describeOrSkip = () => anonymousEnabled ? describe : describe.skip
+  
+  describeOrSkip()('Anonymous user access control', () => {
     let anonClient: any
     let anonymousUserId: string
 
