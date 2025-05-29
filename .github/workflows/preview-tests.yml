@@ -40,8 +40,8 @@ jobs:
         with:
           supabase-access-token: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           supabase-project-id: ${{ secrets.SUPABASE_PROJECT_ID }}
-          wait-for-migrations: true
-          timeout: 300
+          wait-for-migrations: false
+          timeout: 120
 
       - name: Display preview info
         run: |
@@ -63,11 +63,6 @@ jobs:
           echo "   service_role_key: [REDACTED]"
           echo ""
           echo "✅ Preview environment is ready for testing!"
-
-      - name: Wait for seed.sql to complete
-        run: |
-          echo "⏳ Waiting 30 seconds for seed.sql to complete..."
-          sleep 30
 
       - name: Construct preview URL
         id: preview-url
