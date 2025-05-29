@@ -21,6 +21,9 @@ jobs:
     environment: production
     
     steps:
+      - name: Setup WARP for IPv6 support
+        uses: fscarmen/warp-on-actions@v1.0
+        
       - name: Checkout code
         uses: actions/checkout@v4
 
@@ -37,13 +40,6 @@ jobs:
         run: |
           supabase login --token ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           supabase link --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
-
-      - name: Force IPv4 resolution
-        run: |
-          # GitHub Actions doesn't support IPv6, but Supabase uses it
-          # This forces the system to prefer IPv4 addresses
-          echo "precedence ::ffff:0:0/96  100" | sudo tee -a /etc/gai.conf
-          echo "✅ Configured system to prefer IPv4 for database connections"
 
       - name: Backup production database
         if: ${{ !inputs.skip_backup }}
