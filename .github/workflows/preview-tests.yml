@@ -35,7 +35,7 @@ jobs:
           intervalSeconds: 15
 
       - name: Get preview branch credentials
-        uses: 0xbigboss/supabase-branch-gh-action@v1.0.2
+        uses: 0xbigboss/supabase-branch-gh-action@v1
         id: supabase-branch
         with:
           supabase-access-token: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
