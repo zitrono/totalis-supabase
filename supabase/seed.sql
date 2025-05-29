@@ -163,6 +163,24 @@ BEGIN
           'created_at', NOW()
         )
       );
+    ELSE
+      -- User exists, make sure profile exists too
+      INSERT INTO public.profiles (
+        id,
+        coach_id,
+        metadata
+      ) 
+      SELECT 
+        existing_user_id,
+        default_coach_id,
+        jsonb_build_object(
+          'test_account', true,
+          'permanent', true,
+          'created_at', NOW()
+        )
+      WHERE NOT EXISTS (
+        SELECT 1 FROM public.profiles WHERE id = existing_user_id
+      );
     END IF;
   END LOOP;
 END $$;
