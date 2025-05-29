@@ -81,6 +81,40 @@ jobs:
           echo "   (Trusting that Supabase has automatically seeded the database)"
           sleep 60
 
+      - name: Setup Supabase CLI
+        run: |
+          wget -qO- https://github.com/supabase/cli/releases/download/v2.23.8/supabase_linux_amd64.tar.gz | tar xvz
+          sudo mv supabase /usr/local/bin/
+          supabase --version
+
+      - name: Deploy Edge Functions to preview
+        run: |
+          # Login and link to preview project
+          supabase login --token ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          
+          # Get preview project ref from the API URL
+          PREVIEW_API_URL="${{ steps.supabase-branch.outputs.api_url }}"
+          PREVIEW_PROJECT_REF=$(echo $PREVIEW_API_URL | grep -oP '(?<=https://)[^.]+')
+          echo "Preview project ref: $PREVIEW_PROJECT_REF"
+          
+          # Link to preview project
+          supabase link --project-ref $PREVIEW_PROJECT_REF
+          
+          # Deploy all edge functions to preview
+          for function_dir in supabase/functions/*/; do
+            if [ -d "$function_dir" ] && [ -f "$function_dir/index.ts" ]; then
+              function_name=$(basename "$function_dir")
+              if [ "$function_name" != "_shared" ]; then
+                echo "Deploying function to preview: $function_name"
+                supabase functions deploy "$function_name" \
+                  --use-api \
+                  --project-ref $PREVIEW_PROJECT_REF
+              fi
+            fi
+          done
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
       - name: Run integration tests against preview
         run: npm run test:integration
         env:

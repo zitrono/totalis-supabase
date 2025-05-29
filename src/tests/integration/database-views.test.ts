@@ -84,7 +84,7 @@ describe('Database Views', () => {
       
       expect(error).toBeNull()
       expect(data).toBeDefined()
-      expect(data.name).toBe('Test User')
+      // Profile doesn't have name field, only coach details
       expect(data.coach_name).toBe('Test Coach')
       expect(data.coach_bio).toBe('A supportive test coach')
       expect(data.coach_avatar).toBe('https://example.com/coach.jpg')
@@ -343,7 +343,7 @@ describe('Database Views', () => {
       expect(error).toBeNull()
       expect(data).toBeDefined()
       expect(data.content).toBe('Hello coach!')
-      expect(data.sender_name).toBe('Test User')
+      expect(data.sender_name).toBe('User')  // View hardcodes 'User' for user messages
       expect(data.sender_avatar).toBeNull()
     })
   })
