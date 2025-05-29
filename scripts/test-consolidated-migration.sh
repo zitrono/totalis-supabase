@@ -19,7 +19,7 @@ if [ -z "$SUPABASE_DB_PASSWORD" ]; then
 fi
 
 # Path to the consolidated migration
-MIGRATION_FILE="../supabase/migrations/20250529154547_consolidated_base_schema.sql"
+MIGRATION_FILE="../supabase/migrations/20250529154547_refactor_consolidated_base_schema.sql"
 
 if [ ! -f "$MIGRATION_FILE" ]; then
     echo "❌ Error: Consolidated migration not found at $MIGRATION_FILE"

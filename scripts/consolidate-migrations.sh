@@ -9,7 +9,7 @@ echo "🔄 Starting migration consolidation process..."
 # Configuration
 MIGRATIONS_DIR="supabase/migrations"
 ARCHIVE_DIR="supabase/migrations_archive_$(date +%Y%m%d_%H%M%S)"
-NEW_BASE_MIGRATION="$MIGRATIONS_DIR/$(date +%Y%m%d%H%M%S)_initial_consolidated_schema.sql"
+NEW_BASE_MIGRATION="$MIGRATIONS_DIR/$(date +%Y%m%d%H%M%S)_refactor_initial_consolidated_schema.sql"
 
 # Step 1: Create archive directory
 echo "📁 Creating archive directory..."
