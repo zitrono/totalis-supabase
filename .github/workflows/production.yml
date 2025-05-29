@@ -6,6 +6,9 @@ on:
       - main
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 env:
   SUPABASE_CLI_VERSION: 2.23.8
 
