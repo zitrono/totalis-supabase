@@ -8,6 +8,10 @@ on:
       - 'src/**'
       - '.github/workflows/**'
 
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   static-validation:
     runs-on: ubuntu-latest

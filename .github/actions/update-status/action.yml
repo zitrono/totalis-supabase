@@ -233,6 +233,8 @@ runs:
               console.log(`Created status comment: ${newComment.html_url}`);
             }
           } catch (error) {
-            console.error('Failed to update status comment:', error);
+            console.error('Failed to update status comment:', error.message);
+            console.log('This is usually due to restricted GitHub token permissions.');
+            console.log('Status updates will not be visible in PR comments, but the workflow will continue.');
             // Don't fail the job if comment update fails
           }
