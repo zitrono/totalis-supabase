@@ -114,11 +114,12 @@ jobs:
 
       - name: Wait for preview environment to stabilize
         run: |
-          echo "⏳ Waiting 60 seconds for preview environment to stabilize..."
+          echo "⏳ Preview environment is stabilizing..."
           echo "   - Edge functions are being deployed automatically via config.toml"
           echo "   - Secrets are being injected in parallel"
           echo "   - Database is being seeded with test data"
-          sleep 60
+          echo "   - Waiting 15 seconds for final initialization..."
+          sleep 15
           echo "✅ Preview environment should be ready!"
 
       - name: Run integration tests against preview
