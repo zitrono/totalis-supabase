@@ -1,5 +1,5 @@
 -- Seed data for Totalis
--- Last updated: 2025-05-29 (Authenticated-only version)
+-- Last updated: 2025-05-29 (Authenticated-only version with test users)
 
 -- Insert default coaches
 INSERT INTO coaches (name, bio, sex, is_active) VALUES
@@ -82,9 +82,111 @@ WHERE
   (p.name = 'Personal Growth' AND c.name IN ('Learning', 'Career', 'Creativity'))
 ON CONFLICT DO NOTHING;
 
--- For testing in preview branches, we'll use a different approach
--- Test users will be created via a special migration that only runs in test environments
--- See: migrations/*_test_users_preview_only.sql
+-- Create test users in auth.users (following Supabase best practices)
+-- Note: This only works in environments where we have permission to insert into auth.users
+-- In preview branches, these inserts will be skipped due to permissions
+DO $$
+DECLARE
+  test_user_id uuid;
+  default_coach_id uuid;
+BEGIN
+  -- Get default coach ID
+  SELECT id INTO default_coach_id FROM coaches WHERE name = 'Daniel' LIMIT 1;
+  
+  -- Only create test users if we have permission (not in preview branches)
+  -- Check if we can access auth.users by trying a simple select
+  BEGIN
+    PERFORM 1 FROM auth.users LIMIT 1;
+    
+    -- If we get here, we have access to auth.users
+    -- Create test users
+    FOR i IN 1..3 LOOP
+      test_user_id := gen_random_uuid();
+      
+      -- Insert into auth.users
+      INSERT INTO auth.users (
+        instance_id,
+        id,
+        aud,
+        role,
+        email,
+        encrypted_password,
+        email_confirmed_at,
+        created_at,
+        updated_at,
+        raw_app_meta_data,
+        raw_user_meta_data,
+        is_super_admin,
+        confirmation_token,
+        email_change,
+        email_change_token_new,
+        recovery_token
+      ) VALUES (
+        '00000000-0000-0000-0000-000000000000',
+        test_user_id,
+        'authenticated',
+        'authenticated',
+        'test' || i || '@totalis.app',
+        crypt('Test123!@#', gen_salt('bf')),
+        NOW(),
+        NOW(),
+        NOW(),
+        '{"provider":"email","providers":["email"]}',
+        '{"test_account":true}',
+        false,
+        '',
+        '',
+        '',
+        ''
+      ) ON CONFLICT (email) DO NOTHING;
+      
+      -- Insert into auth.identities
+      INSERT INTO auth.identities (
+        id,
+        provider_id,
+        user_id,
+        identity_data,
+        provider,
+        last_sign_in_at,
+        created_at,
+        updated_at
+      ) VALUES (
+        gen_random_uuid(),
+        test_user_id::text,
+        test_user_id,
+        jsonb_build_object(
+          'sub', test_user_id::text,
+          'email', 'test' || i || '@totalis.app',
+          'email_verified', true,
+          'provider', 'email'
+        ),
+        'email',
+        NOW(),
+        NOW(),
+        NOW()
+      ) ON CONFLICT (provider, provider_id) DO NOTHING;
+      
+      -- Create profile (will be created automatically by trigger, but ensure it exists)
+      INSERT INTO profiles (id, coach_id, metadata) VALUES (
+        test_user_id,
+        default_coach_id,
+        jsonb_build_object(
+          'test_account', true,
+          'created_via', 'seed'
+        )
+      ) ON CONFLICT (id) DO NOTHING;
+      
+    END LOOP;
+    
+    RAISE NOTICE 'Test users created successfully';
+    
+  EXCEPTION
+    WHEN insufficient_privilege THEN
+      RAISE NOTICE 'Cannot create test users - insufficient privileges (normal for preview branches)';
+    WHEN OTHERS THEN
+      RAISE NOTICE 'Cannot create test users - %', SQLERRM;
+  END;
+END $$;
 
 -- Log seed completion
 INSERT INTO system_logs (log_level, component, message, metadata) VALUES
@@ -92,5 +194,6 @@ INSERT INTO system_logs (log_level, component, message, metadata) VALUES
     'timestamp', NOW(),
     'coaches_count', (SELECT COUNT(*) FROM coaches),
     'categories_count', (SELECT COUNT(*) FROM categories),
-    'environment', current_setting('app.environment', true)
+    'environment', current_setting('app.environment', true),
+    'test_users_note', 'Test users created in auth.users when permissions allow'
   ));

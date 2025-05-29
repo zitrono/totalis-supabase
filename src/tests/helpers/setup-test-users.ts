@@ -16,7 +16,7 @@ const TEST_USERS: TestUser[] = [
 export async function setupTestUsers(): Promise<void> {
   const config = getTestConfig()
   
-  console.log('🧪 Setting up test environment...')
+  console.log('🧪 Checking test users...')
   
   // Create service client
   const serviceClient = createClient(config.supabaseUrl, config.supabaseServiceKey, {
@@ -26,74 +26,45 @@ export async function setupTestUsers(): Promise<void> {
     }
   })
   
-  // For preview branches, we can't create users in auth.users
-  // Instead, we'll ensure test profiles exist that can be linked when users sign in
-  if (config.isPreview) {
-    console.log('📝 Running in preview mode - setting up test profiles')
-    
-    // Call the setup_test_users function we created in the migration
-    const { data, error } = await serviceClient.rpc('setup_test_users')
-    
-    if (error) {
-      console.error('Failed to setup test users:', error)
-      throw error
-    }
-    
-    console.log('✅ Test profiles created:', data)
-    return
-  }
+  // Test users should be created via seed.sql
+  // This function just verifies they exist
+  let allUsersExist = true
   
-  // For production testing, we can create actual auth users
-  console.log('🔐 Running in production mode - creating auth users')
-  
-  // Get default coach ID from seed data
-  const { data: coaches } = await serviceClient
-    .from('coaches')
-    .select('id')
-    .eq('name', 'Daniel')
-    .limit(1)
-  
-  const defaultCoachId = coaches?.[0]?.id
-  
-  if (!defaultCoachId) {
-    throw new Error('Default coach not found - ensure seed data is applied')
-  }
-  
-  // In production, we can create test users via auth.admin API
   for (const testUser of TEST_USERS) {
     try {
-      // Check if user already exists
-      const { data: existingAuth } = await serviceClient.auth.signInWithPassword({
+      // Try to sign in to check if user exists
+      const { data, error } = await serviceClient.auth.signInWithPassword({
         email: testUser.email,
         password: testUser.password
       })
       
-      if (existingAuth?.user) {
-        console.log(`✅ Test user ${testUser.email} already exists`)
-        continue
+      if (error) {
+        console.log(`❌ Test user ${testUser.email} not found: ${error.message}`)
+        allUsersExist = false
+      } else {
+        console.log(`✅ Test user ${testUser.email} exists`)
+        // Sign out to clean up session
+        await serviceClient.auth.signOut()
       }
-      
-      // Create new user via signup (works in production)
-      const { data: newAuth, error: signUpError } = await serviceClient.auth.signUp({
-        email: testUser.email,
-        password: testUser.password,
-        options: {
-          data: testUser.metadata
-        }
-      })
-      
-      if (signUpError && !signUpError.message?.includes('already registered')) {
-        throw signUpError
-      }
-      
-      console.log(`✅ Created test user: ${testUser.email}`)
     } catch (error) {
-      console.error(`⚠️  Issue with test user ${testUser.email}:`, error)
-      // Continue with other users
+      console.error(`Error checking ${testUser.email}:`, error)
+      allUsersExist = false
     }
   }
   
-  console.log('✨ Test user setup complete')
+  if (!allUsersExist) {
+    console.log(`
+⚠️  Some test users are missing. Please ensure:
+1. You've run the latest migrations
+2. seed.sql has been applied
+3. You're running against the correct environment
+
+In preview branches, test users may not be available due to auth.users restrictions.
+Tests will skip authentication steps in this case.
+    `)
+  } else {
+    console.log('✨ All test users verified')
+  }
 }
 
 // Export test user credentials for use in tests
