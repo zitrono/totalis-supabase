@@ -89,7 +89,7 @@ jobs:
           
           # Generate SQL schema dump
           echo "Generating SQL schema..."
-          supabase db dump --schema public > docs/database-schema.sql
+          supabase db dump --schema public --password ${{ secrets.SUPABASE_DB_PASSWORD }} > docs/database-schema.sql
           
           # Generate TypeScript types
           echo "Generating TypeScript types..."
