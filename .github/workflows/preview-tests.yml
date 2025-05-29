@@ -50,12 +50,33 @@ jobs:
           echo "   DB Host: ${{ steps.supabase-branch.outputs.db_host }}"
           echo "   Branch: ${{ github.head_ref }}"
           echo ""
+          echo "📋 All outputs:"
+          echo "   ref: ${{ steps.supabase-branch.outputs.ref }}"
+          echo "   api_url: ${{ steps.supabase-branch.outputs.api_url }}"
+          echo "   graphql_url: ${{ steps.supabase-branch.outputs.graphql_url }}"
+          echo "   db_host: ${{ steps.supabase-branch.outputs.db_host }}"
+          echo "   db_port: ${{ steps.supabase-branch.outputs.db_port }}"
+          echo "   db_user: ${{ steps.supabase-branch.outputs.db_user }}"
+          echo "   db_password: [REDACTED]"
+          echo "   jwt_secret: [REDACTED]"
+          echo "   anon_key: [REDACTED]"
+          echo "   service_role_key: [REDACTED]"
+          echo ""
           echo "✅ Preview environment is ready for testing!"
+
+      - name: Construct preview URL
+        id: preview-url
+        run: |
+          # Extract base URL from api_url by removing /rest/v1
+          API_URL="${{ steps.supabase-branch.outputs.api_url }}"
+          BASE_URL="${API_URL%/rest/v1}"
+          echo "base_url=$BASE_URL" >> $GITHUB_OUTPUT
+          echo "Constructed base URL: $BASE_URL"
 
       - name: Run integration tests against preview
         run: npm run test:integration
         env:
-          SUPABASE_URL: ${{ steps.supabase-branch.outputs.api_url }}
+          SUPABASE_URL: ${{ steps.preview-url.outputs.base_url }}
           SUPABASE_ANON_KEY: ${{ steps.supabase-branch.outputs.anon_key }}
           SUPABASE_SERVICE_KEY: ${{ steps.supabase-branch.outputs.service_role_key }}
           DATABASE_URL: postgresql://postgres:${{ steps.supabase-branch.outputs.db_password }}@${{ steps.supabase-branch.outputs.db_host }}:${{ steps.supabase-branch.outputs.db_port }}/postgres
