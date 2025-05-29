@@ -15,7 +15,7 @@ export const getTestConfig = (): TestConfig => {
   return {
     supabaseUrl,
     supabaseAnonKey: process.env.SUPABASE_ANON_KEY!,
-    supabaseServiceKey: process.env.SUPABASE_SERVICE_KEY!,
+    supabaseServiceKey: process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY!,
     testMode: 'remote'
   }
 }
