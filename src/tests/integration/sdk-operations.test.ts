@@ -144,7 +144,7 @@ describe('SDK Operations - Priority 1 Mobile Migration', () => {
     beforeEach(async () => {
       // Ensure authenticated for storage operations
       const { error } = await supabase.auth.signInWithPassword({
-        email: 'test1@totalis.test',
+        email: 'test1@totalis.app',
         password: 'Test123!@#'
       })
       expect(error).toBeNull()
