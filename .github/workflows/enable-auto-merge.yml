@@ -1,0 +1,85 @@
+name: Enable Auto-Merge
+
+on:
+  pull_request:
+    types: [opened, reopened]
+
+jobs:
+  enable-auto-merge:
+    runs-on: ubuntu-latest
+    # Only run for non-draft PRs
+    if: github.event.pull_request.draft == false
+    
+    permissions:
+      contents: write
+      pull-requests: write
+    
+    steps:
+      - name: Check PR labels
+        id: check-labels
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const labels = context.payload.pull_request.labels.map(l => l.name);
+            
+            // Check for blocking labels
+            const blockingLabels = ['do-not-merge', 'work-in-progress', 'needs-review'];
+            const hasBlockingLabel = labels.some(label => blockingLabels.includes(label));
+            
+            if (hasBlockingLabel) {
+              console.log('❌ PR has blocking labels, skipping auto-merge');
+              return false;
+            }
+            
+            core.setOutput('should_enable', !hasBlockingLabel);
+            return !hasBlockingLabel;
+
+      - name: Enable auto-merge
+        if: steps.check-labels.outputs.should_enable == 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            try {
+              await github.graphql(`
+                mutation EnableAutoMerge($pullRequestId: ID!, $mergeMethod: PullRequestMergeMethod!) {
+                  enablePullRequestAutoMerge(input: {
+                    pullRequestId: $pullRequestId,
+                    mergeMethod: $mergeMethod
+                  }) {
+                    pullRequest {
+                      autoMergeRequest {
+                        enabledAt
+                        mergeMethod
+                      }
+                    }
+                  }
+                }
+              `, {
+                pullRequestId: context.payload.pull_request.node_id,
+                mergeMethod: 'SQUASH' // MERGE, SQUASH, or REBASE
+              });
+              
+              console.log('✅ Auto-merge enabled for PR #${{ github.event.pull_request.number }}');
+              
+              // Add comment
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: `🤖 **Auto-merge enabled**\n\nThis PR will be automatically merged once all required status checks pass.\n\nTo disable auto-merge, add the \`do-not-merge\` label or close and reopen the PR.`
+              });
+              
+            } catch (error) {
+              console.log(`Failed to enable auto-merge: ${error.message}`);
+              
+              // Only comment if it's a permissions issue
+              if (error.message.includes('permission')) {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.issue.number,
+                  body: `⚠️ **Could not enable auto-merge**\n\nAuto-merge may not be enabled for this repository. Please check repository settings:\n\n1. Go to Settings → General\n2. Under "Pull Requests", enable "Allow auto-merge"`
+                });
+              }
+            }

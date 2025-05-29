@@ -1,0 +1,230 @@
+name: Auto Merge
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  check_suite:
+    types: [completed]
+  workflow_run:
+    workflows: ["Validate Supabase Assets", "Preview Environment Tests"]
+    types: [completed]
+
+jobs:
+  auto-merge:
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'workflow_run' && 
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'pull_request'
+    
+    permissions:
+      contents: write
+      pull-requests: write
+      checks: read
+    
+    steps:
+      - name: Get PR details
+        id: pr-details
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // Get PR number from workflow run
+            const workflowRun = context.payload.workflow_run;
+            const pr = workflowRun.pull_requests[0];
+            
+            if (!pr) {
+              console.log('No PR associated with this workflow run');
+              return;
+            }
+            
+            core.setOutput('pr_number', pr.number);
+            core.setOutput('pr_head_sha', workflowRun.head_sha);
+            
+            // Get PR details
+            const { data: pullRequest } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pr.number
+            });
+            
+            core.setOutput('pr_state', pullRequest.state);
+            core.setOutput('pr_mergeable', pullRequest.mergeable);
+            core.setOutput('pr_draft', pullRequest.draft);
+            
+            return pullRequest;
+
+      - name: Check all required status checks
+        id: check-status
+        if: steps.pr-details.outputs.pr_number
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr_number = ${{ steps.pr-details.outputs.pr_number }};
+            const pr_sha = '${{ steps.pr-details.outputs.pr_head_sha }}';
+            
+            // Get all check runs for this commit
+            const { data: checkRuns } = await github.rest.checks.listForRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: pr_sha
+            });
+            
+            console.log(`Found ${checkRuns.check_runs.length} check runs`);
+            
+            // Define required checks
+            const requiredChecks = [
+              'Fast Static Validation',
+              'validate-migrations',
+              'validate-functions',
+              'validate-config',
+              'run-integration-tests',
+              'test-preview'
+            ];
+            
+            // Check if all required checks passed
+            let allChecksPassed = true;
+            let checksStatus = {};
+            
+            for (const checkName of requiredChecks) {
+              const check = checkRuns.check_runs.find(c => c.name === checkName);
+              if (!check) {
+                console.log(`❌ Required check not found: ${checkName}`);
+                checksStatus[checkName] = 'not_found';
+                allChecksPassed = false;
+              } else if (check.status !== 'completed') {
+                console.log(`⏳ Check still running: ${checkName}`);
+                checksStatus[checkName] = 'in_progress';
+                allChecksPassed = false;
+              } else if (check.conclusion !== 'success') {
+                console.log(`❌ Check failed: ${checkName} (${check.conclusion})`);
+                checksStatus[checkName] = check.conclusion;
+                allChecksPassed = false;
+              } else {
+                console.log(`✅ Check passed: ${checkName}`);
+                checksStatus[checkName] = 'success';
+              }
+            }
+            
+            core.setOutput('all_checks_passed', allChecksPassed);
+            core.setOutput('checks_status', JSON.stringify(checksStatus));
+            
+            return allChecksPassed;
+
+      - name: Wait for PR to be mergeable
+        if: |
+          steps.pr-details.outputs.pr_number && 
+          steps.check-status.outputs.all_checks_passed == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr_number = ${{ steps.pr-details.outputs.pr_number }};
+            let attempts = 0;
+            const maxAttempts = 10;
+            
+            while (attempts < maxAttempts) {
+              const { data: pr } = await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: pr_number
+              });
+              
+              console.log(`Attempt ${attempts + 1}: Mergeable=${pr.mergeable}, State=${pr.mergeable_state}`);
+              
+              if (pr.mergeable === true && pr.mergeable_state === 'clean') {
+                console.log('✅ PR is mergeable!');
+                return true;
+              }
+              
+              if (pr.mergeable === false) {
+                console.log('❌ PR has conflicts and cannot be merged');
+                return false;
+              }
+              
+              // Wait 5 seconds before next attempt
+              await new Promise(resolve => setTimeout(resolve, 5000));
+              attempts++;
+            }
+            
+            console.log('❌ Timeout waiting for PR to become mergeable');
+            return false;
+
+      - name: Auto-merge PR
+        if: |
+          steps.pr-details.outputs.pr_number && 
+          steps.pr-details.outputs.pr_state == 'open' &&
+          steps.pr-details.outputs.pr_draft != 'true' &&
+          steps.check-status.outputs.all_checks_passed == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr_number = ${{ steps.pr-details.outputs.pr_number }};
+            
+            try {
+              // Enable auto-merge
+              const result = await github.rest.pulls.merge({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: pr_number,
+                merge_method: 'squash' // or 'merge' or 'rebase'
+              });
+              
+              console.log(`✅ Successfully merged PR #${pr_number}`);
+              
+              // Comment on PR
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr_number,
+                body: `🎉 **Auto-merged!**\n\nAll required checks passed. This PR has been automatically merged.`
+              });
+              
+            } catch (error) {
+              console.log(`❌ Failed to merge PR: ${error.message}`);
+              
+              // Comment about failure
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr_number,
+                body: `❌ **Auto-merge failed**\n\nAll checks passed but the PR could not be merged automatically.\n\nError: ${error.message}\n\nPlease merge manually.`
+              });
+            }
+
+  # Alternative trigger - run periodically to catch any missed PRs
+  check-pending-prs:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    
+    permissions:
+      contents: write
+      pull-requests: write
+      checks: read
+    
+    steps:
+      - name: Check all open PRs
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: prs } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open'
+            });
+            
+            console.log(`Found ${prs.length} open PRs`);
+            
+            for (const pr of prs) {
+              if (pr.draft) {
+                console.log(`Skipping draft PR #${pr.number}`);
+                continue;
+              }
+              
+              // Trigger auto-merge check for each PR
+              console.log(`Checking PR #${pr.number}...`);
+              // The actual merge logic would be triggered by the workflow_run event
+            }
+
+# Add schedule to periodically check for mergeable PRs
+# on:
+#   schedule:
+#     - cron: '*/15 * * * *' # Every 15 minutes
