@@ -58,7 +58,7 @@ SELECT
   m.*,
   CASE 
     WHEN m.role = 'assistant' THEN c.name
-    ELSE p.name
+    ELSE 'User'
   END as sender_name,
   CASE 
     WHEN m.role = 'assistant' THEN c.photo_url

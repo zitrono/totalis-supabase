@@ -40,8 +40,6 @@ jobs:
         with:
           supabase-access-token: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           supabase-project-id: ${{ secrets.SUPABASE_PROJECT_ID }}
-          # The branch name is the PR branch name
-          git-branch: ${{ github.head_ref }}
           wait-for-migrations: true
           timeout: 120
 
