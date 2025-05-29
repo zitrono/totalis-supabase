@@ -64,11 +64,6 @@ jobs:
           echo ""
           echo "✅ Preview environment is ready for testing!"
 
-      - name: Wait for seed.sql to complete
-        run: |
-          echo "⏳ Waiting 60 seconds for seed.sql to complete..."
-          sleep 60
-
       - name: Construct preview URL
         id: preview-url
         run: |
@@ -78,17 +73,49 @@ jobs:
           echo "base_url=$BASE_URL" >> $GITHUB_OUTPUT
           echo "Constructed base URL: $BASE_URL"
 
-      - name: Verify test data exists
+      - name: Wait for seed data to be ready
         run: |
-          echo "🔍 Checking if test users exist in preview database..."
-          # Use psql to check if test users exist
+          echo "🔍 Waiting for seed data to be ready..."
           export PGPASSWORD="${{ steps.supabase-branch.outputs.db_password }}"
-          psql "postgresql://postgres@${{ steps.supabase-branch.outputs.db_host }}:${{ steps.supabase-branch.outputs.db_port }}/postgres" \
-            -c "SELECT email, created_at FROM auth.users WHERE email LIKE 'test%@totalis.app' ORDER BY email;" || true
+          DB_URL="postgresql://postgres@${{ steps.supabase-branch.outputs.db_host }}:${{ steps.supabase-branch.outputs.db_port }}/postgres"
           
-          echo "🔍 Checking auth settings..."
-          psql "postgresql://postgres@${{ steps.supabase-branch.outputs.db_host }}:${{ steps.supabase-branch.outputs.db_port }}/postgres" \
-            -c "SELECT key, value FROM auth.config WHERE key IN ('enable_anonymous_sign_ins', 'enable_signup');" || true
+          # Wait up to 3 minutes for test users to appear
+          for i in {1..36}; do
+            echo "Attempt $i/36: Checking for test users..."
+            
+            # Check if test users exist
+            USER_COUNT=$(psql "$DB_URL" -t -c "SELECT COUNT(*) FROM auth.users WHERE email LIKE 'test%@totalis.app';" 2>/dev/null || echo "0")
+            USER_COUNT=$(echo $USER_COUNT | xargs)  # Trim whitespace
+            
+            if [ "$USER_COUNT" -ge "3" ]; then
+              echo "✅ Found $USER_COUNT test users!"
+              
+              # Display test users
+              echo "📋 Test users in database:"
+              psql "$DB_URL" -c "SELECT email, created_at FROM auth.users WHERE email LIKE 'test%@totalis.app' ORDER BY email;"
+              
+              # Check auth settings
+              echo "🔍 Auth configuration:"
+              psql "$DB_URL" -c "SELECT key, value FROM auth.config WHERE key IN ('enable_anonymous_sign_ins', 'enable_signup');" || true
+              
+              # Check if profiles exist
+              echo "🔍 Checking profiles:"
+              psql "$DB_URL" -c "SELECT user_id, display_name FROM profiles WHERE user_id IN (SELECT id FROM auth.users WHERE email LIKE 'test%@totalis.app');" || true
+              
+              break
+            else
+              echo "Found $USER_COUNT test users, waiting..."
+              sleep 5
+            fi
+          done
+          
+          # Final check
+          if [ "$USER_COUNT" -lt "3" ]; then
+            echo "❌ Error: Test users not found after 3 minutes!"
+            echo "Checking migration status..."
+            psql "$DB_URL" -c "SELECT name, executed_at FROM supabase_migrations.schema_migrations ORDER BY executed_at DESC LIMIT 10;" || true
+            exit 1
+          fi
 
       - name: Run integration tests against preview
         run: npm run test:integration
