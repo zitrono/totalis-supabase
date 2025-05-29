@@ -18,8 +18,13 @@ BEGIN
             'app_config', 'audio_transcriptions', 'account_links'
         )
     LOOP
-        EXECUTE format('DROP POLICY IF EXISTS %I ON %I.%I', 
-            r.policyname, r.schemaname, r.tablename);
+        BEGIN
+            EXECUTE format('DROP POLICY IF EXISTS %I ON %I.%I', 
+                r.policyname, r.schemaname, r.tablename);
+        EXCEPTION WHEN OTHERS THEN
+            -- Ignore errors when dropping policies
+            NULL;
+        END;
     END LOOP;
 END $$;
 
