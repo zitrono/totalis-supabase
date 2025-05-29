@@ -74,13 +74,6 @@ jobs:
           echo "base_url=$BASE_URL" >> $GITHUB_OUTPUT
           echo "Constructed base URL: $BASE_URL"
 
-      - name: Wait for preview environment to stabilize
-        run: |
-          echo "⏳ Waiting 60 seconds for preview environment to stabilize..."
-          echo "   (GitHub Actions cannot connect to preview DB due to IPv6)"
-          echo "   (Trusting that Supabase has automatically seeded the database)"
-          sleep 60
-
       - name: Setup Supabase CLI
         run: |
           # Download to tmp directory to avoid conflicts
@@ -90,33 +83,43 @@ jobs:
           cd $GITHUB_WORKSPACE
           supabase --version
 
-      - name: Deploy Edge Functions to preview
+      - name: Inject secrets (non-blocking)
         run: |
-          # Login and link to preview project
-          supabase login --token ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          
-          # Get preview project ref from the API URL
+          # Extract project ref from preview URL
           PREVIEW_API_URL="${{ steps.supabase-branch.outputs.api_url }}"
           PREVIEW_PROJECT_REF=$(echo $PREVIEW_API_URL | grep -oP '(?<=https://)[^.]+')
           echo "Preview project ref: $PREVIEW_PROJECT_REF"
           
-          # Link to preview project
-          supabase link --project-ref $PREVIEW_PROJECT_REF
-          
-          # Deploy all edge functions to preview
-          for function_dir in supabase/functions/*/; do
-            if [ -d "$function_dir" ] && [ -f "$function_dir/index.ts" ]; then
-              function_name=$(basename "$function_dir")
-              if [ "$function_name" != "_shared" ]; then
-                echo "Deploying function to preview: $function_name"
-                supabase functions deploy "$function_name" \
-                  --use-api \
-                  --project-ref $PREVIEW_PROJECT_REF
-              fi
-            fi
-          done
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          # Run secrets injection in background - doesn't block workflow
+          (
+            echo "🔐 Starting secrets injection in background..."
+            
+            # Login and link to preview project
+            supabase login --token ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+            supabase link --project-ref $PREVIEW_PROJECT_REF
+            
+            # Create temporary .env file with secrets
+            cat > supabase/.env.preview <<EOF
+          OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+          EOF
+            
+            # Push secrets to preview branch
+            supabase secrets set --env-file supabase/.env.preview --project-ref $PREVIEW_PROJECT_REF
+            
+            # Clean up temp file
+            rm -f supabase/.env.preview
+            
+            echo "✅ Secrets injection completed"
+          ) &
+
+      - name: Wait for preview environment to stabilize
+        run: |
+          echo "⏳ Waiting 60 seconds for preview environment to stabilize..."
+          echo "   - Edge functions are being deployed automatically via config.toml"
+          echo "   - Secrets are being injected in parallel"
+          echo "   - Database is being seeded with test data"
+          sleep 60
+          echo "✅ Preview environment should be ready!"
 
       - name: Run integration tests against preview
         run: npm run test:integration
