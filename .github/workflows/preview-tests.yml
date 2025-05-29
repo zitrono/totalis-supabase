@@ -83,10 +83,11 @@ jobs:
 
       - name: Setup Supabase CLI
         run: |
-          # Remove any existing supabase binary first
-          rm -f supabase
+          # Download to tmp directory to avoid conflicts
+          cd /tmp
           wget -qO- https://github.com/supabase/cli/releases/download/v2.23.8/supabase_linux_amd64.tar.gz | tar xvz
           sudo mv supabase /usr/local/bin/
+          cd $GITHUB_WORKSPACE
           supabase --version
 
       - name: Deploy Edge Functions to preview
