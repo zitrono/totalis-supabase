@@ -15,6 +15,12 @@ Complete documentation for the Totalis wellness platform migration to Supabase.
 - [Backend Architecture](../backend-architecture.md) - Current FastAPI architecture
 - [Architecture Recommendation](../architecture-recommendation.md) - Migration strategy
 
+#### 📊 Auto-Generated Schema Documentation
+These files are automatically updated after each production deployment:
+- [database-schema.sql](database-schema.sql) - Complete SQL DDL dump (auto-generated)
+- [database.types.ts](database.types.ts) - TypeScript type definitions (auto-generated)
+- [schema-generated.txt](schema-generated.txt) - Generation timestamp and commit info
+
 ### 🔧 Technical Implementation
 
 #### Edge Functions ✅ DEPLOYED

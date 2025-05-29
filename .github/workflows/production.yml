@@ -80,6 +80,37 @@ jobs:
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           ENVIRONMENT: production
 
+      - name: Generate and save database schema documentation
+        run: |
+          echo "📚 Generating database schema documentation..."
+          
+          # Create docs directory if it doesn't exist
+          mkdir -p docs
+          
+          # Generate SQL schema dump
+          echo "Generating SQL schema..."
+          supabase db dump --schema public > docs/database-schema.sql
+          
+          # Generate TypeScript types
+          echo "Generating TypeScript types..."
+          npx supabase gen types typescript --project-id ${{ secrets.SUPABASE_PROJECT_ID }} > docs/database.types.ts
+          
+          # Create a timestamp file to track when schema was last generated
+          echo "Generated from production deployment on $(date -u '+%Y-%m-%d %H:%M:%S UTC')" > docs/schema-generated.txt
+          echo "Commit: ${{ github.sha }}" >> docs/schema-generated.txt
+          
+          echo "✅ Schema documentation generated successfully"
+
+      - name: Commit schema documentation
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "docs: Update database schema documentation [skip ci]"
+          file_pattern: docs/database-schema.sql docs/database.types.ts docs/schema-generated.txt
+          branch: main
+          commit_user_name: "GitHub Actions"
+          commit_user_email: "actions@github.com"
+          skip_checkout: true
+
       - name: Notify deployment status
         if: always()
         uses: actions/github-script@v7
