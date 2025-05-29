@@ -26,8 +26,11 @@ jobs:
 
       - name: Setup Supabase CLI
         run: |
+          # Download to tmp directory to avoid conflicts
+          cd /tmp
           wget -qO- https://github.com/supabase/cli/releases/download/v${SUPABASE_CLI_VERSION}/supabase_linux_amd64.tar.gz | tar xvz
           sudo mv supabase /usr/local/bin/
+          cd $GITHUB_WORKSPACE
           supabase --version
 
       - name: Authenticate Supabase CLI
@@ -106,7 +109,7 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const status = job.status === 'success' ? '✅ Success' : '❌ Failed';
+            const status = '${{ job.status }}' === 'success' ? '✅ Success' : '❌ Failed';
             const commit = context.sha.substring(0, 7);
             const message = `Production Deployment ${status}\n\nCommit: ${commit}\nRun: ${context.runId}`;
             
