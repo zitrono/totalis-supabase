@@ -100,15 +100,14 @@ jobs:
           
           echo "✅ TypeScript types generated successfully"
 
-      - name: Commit type documentation
-        uses: stefanzweifel/git-auto-commit-action@v5
+      - name: Upload type documentation as artifact
+        uses: actions/upload-artifact@v4
         with:
-          commit_message: "docs: Update TypeScript type definitions [skip ci]"
-          file_pattern: docs/database.types.ts docs/types-generated.txt
-          branch: main
-          commit_user_name: "GitHub Actions"
-          commit_user_email: "actions@github.com"
-          skip_checkout: true
+          name: database-types
+          path: |
+            docs/database.types.ts
+            docs/types-generated.txt
+          retention-days: 30
 
       - name: Notify deployment status
         if: always()

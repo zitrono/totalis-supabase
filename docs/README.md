@@ -16,11 +16,16 @@ Complete documentation for the Totalis wellness platform migration to Supabase.
 - [Architecture Recommendation](../architecture-recommendation.md) - Migration strategy
 
 #### 📊 Auto-Generated Type Documentation
-These files are automatically updated after each production deployment:
-- [database.types.ts](database.types.ts) - TypeScript type definitions (auto-generated)
-- [types-generated.txt](types-generated.txt) - Generation timestamp and commit info
+TypeScript type definitions are automatically generated after each production deployment and saved as GitHub Actions artifacts.
 
-Note: SQL schema dump is not generated due to IPv6 connectivity limitations in GitHub Actions.
+To download the latest types:
+1. Go to the [Actions tab](https://github.com/zitrono/totalis-supabase/actions)
+2. Click on the latest Production Deployment workflow
+3. Download the `database-types` artifact
+
+Note: 
+- SQL schema dump is not generated due to IPv6 connectivity limitations
+- Types are not auto-committed due to branch protection rules
 
 ### 🔧 Technical Implementation
 
