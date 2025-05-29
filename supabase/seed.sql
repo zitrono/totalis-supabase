@@ -77,6 +77,114 @@ CROSS JOIN (VALUES
 WHERE p.name = c.parent_name
 ON CONFLICT DO NOTHING;
 
+-- Create test users for preview environments
+-- These users will only exist in preview branches, not in production
+DO $$
+DECLARE
+  test_user_id UUID;
+  default_coach_id UUID;
+  existing_user_id UUID;
+BEGIN
+  -- Get default coach ID
+  SELECT id INTO default_coach_id FROM coaches WHERE name = 'Daniel' LIMIT 1;
+  
+  -- Create test users
+  FOR i IN 1..5 LOOP
+    -- Check if user already exists
+    SELECT id INTO existing_user_id 
+    FROM auth.users 
+    WHERE email = 'test' || i || '@totalis.app';
+    
+    IF existing_user_id IS NULL THEN
+      test_user_id := gen_random_uuid();
+      
+      -- Insert user into auth.users
+      INSERT INTO auth.users (
+        instance_id,
+        id,
+        aud,
+        role,
+        email,
+        encrypted_password,
+        email_confirmed_at,
+        raw_app_meta_data,
+        raw_user_meta_data,
+        created_at,
+        updated_at
+      ) VALUES (
+        '00000000-0000-0000-0000-000000000000',
+        test_user_id,
+        'authenticated',
+        'authenticated',
+        'test' || i || '@totalis.app',
+        crypt('Test123!@#', gen_salt('bf')),
+        NOW(),
+        '{"provider":"email","providers":["email"]}',
+        '{"test_account":true}',
+        NOW(),
+        NOW()
+      );
+      
+      -- Create identity for the user (required for auth to work properly)
+      INSERT INTO auth.identities (
+        id,
+        provider_id,
+        user_id,
+        identity_data,
+        provider,
+        last_sign_in_at,
+        created_at,
+        updated_at
+      ) VALUES (
+        gen_random_uuid(),
+        test_user_id,
+        test_user_id,
+        jsonb_build_object(
+          'sub', test_user_id::text,
+          'email', 'test' || i || '@totalis.app'
+        ),
+        'email',
+        NOW(),
+        NOW(),
+        NOW()
+      );
+      
+      -- Create profile for the user
+      INSERT INTO public.profiles (
+        id,
+        coach_id,
+        metadata
+      ) VALUES (
+        test_user_id,
+        default_coach_id,
+        jsonb_build_object(
+          'test_account', true,
+          'permanent', true,
+          'created_at', NOW()
+        )
+      );
+    ELSE
+      -- User exists, make sure profile exists too
+      INSERT INTO public.profiles (
+        id,
+        coach_id,
+        metadata
+      ) 
+      SELECT 
+        existing_user_id,
+        default_coach_id,
+        jsonb_build_object(
+          'test_account', true,
+          'permanent', true,
+          'created_at', NOW()
+        )
+      WHERE NOT EXISTS (
+        SELECT 1 FROM public.profiles WHERE id = existing_user_id
+      );
+    END IF;
+  END LOOP;
+END $$;
+
 -- Grant necessary permissions for anonymous users
 GRANT USAGE ON SCHEMA public TO anon;
 GRANT SELECT ON coaches, categories, app_config TO anon;
