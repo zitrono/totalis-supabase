@@ -16,6 +16,14 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+      
+      - name: Report Job Start
+        if: always()
+        uses: ./.github/actions/update-status
+        with:
+          job_name: 'Fast Static Validation'
+          status: 'in_progress'
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Deno
         uses: denoland/setup-deno@v1
@@ -23,8 +31,12 @@ jobs:
           deno-version: v1.37.0
 
       - name: Validate Migration Naming
+        id: migration_check
         run: |
           echo "🔍 Checking migration naming convention..."
+          
+          errors='[]'
+          has_error=false
           
           for file in supabase/migrations/*.sql; do
             if [ -f "$file" ]; then
@@ -34,10 +46,23 @@ jobs:
                 echo "❌ Invalid migration name: $filename"
                 echo "Expected format: YYYYMMDDHHMMSS_prefix_description.sql"
                 echo "Valid prefixes: feat_, fix_, refactor_, hf_"
-                exit 1
+                
+                # Build error JSON
+                error_msg="Invalid migration name: $filename"
+                suggestion="Rename to format: YYYYMMDDHHMMSS_prefix_description.sql"
+                errors=$(echo "$errors" | jq --arg msg "$error_msg" --arg file "$file" --arg sug "$suggestion" \
+                  '. + [{"type": "validation_error", "message": $msg, "file": $file, "suggestion": $sug}]')
+                has_error=true
               fi
             fi
           done
+          
+          echo "errors=$errors" >> $GITHUB_OUTPUT
+          
+          if [ "$has_error" = true ]; then
+            exit 1
+          fi
+          
           echo "✅ All migrations follow naming convention"
 
       - name: Quick SQL Syntax Check
@@ -194,3 +219,13 @@ jobs:
             Once fixed, push your changes and validation will run again automatically." || echo "Note: Could not post PR comment (insufficient permissions)"
         env:
           GH_TOKEN: ${{ github.token }}
+      
+      - name: Report Final Status
+        if: always()
+        uses: ./.github/actions/update-status
+        with:
+          job_name: 'Fast Static Validation'
+          status: ${{ job.status }}
+          duration: ${{ steps.migration_check.outcome && '5s' || '0s' }}
+          errors: ${{ steps.migration_check.outputs.errors || '[]' }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}

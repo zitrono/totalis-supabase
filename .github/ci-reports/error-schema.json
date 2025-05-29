@@ -1,0 +1,87 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "CI/CD Error Report Schema",
+  "type": "object",
+  "properties": {
+    "run_id": {
+      "type": "string",
+      "description": "GitHub Actions run ID"
+    },
+    "run_number": {
+      "type": "number",
+      "description": "GitHub Actions run number"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["success", "failure", "cancelled", "in_progress"],
+      "description": "Overall pipeline status"
+    },
+    "jobs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Job name"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["success", "failure", "cancelled", "skipped", "in_progress", "pending"]
+          },
+          "duration": {
+            "type": "string",
+            "description": "Job duration (e.g., '45s', '2m 30s')"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "completed_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": ["test_failure", "build_error", "deployment_error", "validation_error", "timeout"]
+                },
+                "message": {
+                  "type": "string"
+                },
+                "file": {
+                  "type": "string",
+                  "description": "File path where error occurred"
+                },
+                "line": {
+                  "type": "number",
+                  "description": "Line number where error occurred"
+                },
+                "details": {
+                  "type": "string",
+                  "description": "Additional error details or stack trace"
+                },
+                "suggestion": {
+                  "type": "string",
+                  "description": "Suggested fix for the error"
+                }
+              },
+              "required": ["type", "message"]
+            }
+          }
+        },
+        "required": ["name", "status"]
+      }
+    }
+  },
+  "required": ["run_id", "timestamp", "status", "jobs"]
+}

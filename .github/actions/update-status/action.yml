@@ -1,0 +1,238 @@
+name: 'Update CI/CD Status'
+description: 'Updates the progressive CI/CD status report in PR comments'
+inputs:
+  job_name:
+    description: 'Name of the current job'
+    required: true
+  status:
+    description: 'Status of the job (success, failure, skipped, cancelled)'
+    required: true
+  duration:
+    description: 'Duration of the job'
+    required: false
+    default: ''
+  errors:
+    description: 'JSON array of errors (if any)'
+    required: false
+    default: '[]'
+  github_token:
+    description: 'GitHub token for API access'
+    required: true
+    default: ${{ github.token }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Update Status Comment
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ inputs.github_token }}
+        script: |
+          const fs = require('fs');
+          const path = require('path');
+          
+          // Constants
+          const COMMENT_IDENTIFIER = '<!-- ci-cd-status-report -->';
+          const MAX_COMMENT_SIZE = 65536; // GitHub's comment size limit
+          
+          // Get PR number
+          const pr_number = context.issue.number || context.payload.pull_request?.number;
+          if (!pr_number) {
+            console.log('No PR number found, skipping status update');
+            return;
+          }
+          
+          // Parse inputs
+          const jobName = '${{ inputs.job_name }}';
+          const status = '${{ inputs.status }}';
+          const duration = '${{ inputs.duration }}';
+          const errors = JSON.parse('${{ inputs.errors }}' || '[]');
+          
+          // Status emoji mapping
+          const statusEmoji = {
+            'success': '✅',
+            'failure': '❌',
+            'skipped': '⏭️',
+            'cancelled': '🚫',
+            'in_progress': '🔄',
+            'pending': '⏳'
+          };
+          
+          // Find existing comment
+          const { data: comments } = await github.rest.issues.listComments({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: pr_number
+          });
+          
+          const statusComment = comments.find(comment => 
+            comment.body?.includes(COMMENT_IDENTIFIER)
+          );
+          
+          // Get current status data
+          let statusData = {
+            run_id: context.runId.toString(),
+            run_number: context.runNumber,
+            workflow: context.workflow,
+            timestamp: new Date().toISOString(),
+            jobs: {},
+            errors: {}
+          };
+          
+          // Parse existing data if comment exists
+          if (statusComment) {
+            try {
+              const dataMatch = statusComment.body.match(/<!-- status-data:(.*?)-->/s);
+              if (dataMatch) {
+                statusData = JSON.parse(Buffer.from(dataMatch[1], 'base64').toString());
+              }
+            } catch (e) {
+              console.log('Failed to parse existing status data:', e);
+            }
+          }
+          
+          // Update job status
+          statusData.jobs[jobName] = {
+            status: status,
+            duration: duration,
+            timestamp: new Date().toISOString(),
+            emoji: statusEmoji[status] || '❓'
+          };
+          
+          // Update errors
+          if (errors.length > 0) {
+            statusData.errors[jobName] = errors;
+          } else if (status === 'success') {
+            delete statusData.errors[jobName];
+          }
+          
+          // Calculate overall stats
+          const jobStatuses = Object.values(statusData.jobs);
+          const completed = jobStatuses.filter(j => ['success', 'failure', 'skipped', 'cancelled'].includes(j.status)).length;
+          const failed = jobStatuses.filter(j => j.status === 'failure').length;
+          const running = jobStatuses.filter(j => j.status === 'in_progress').length;
+          const total = Object.keys(statusData.jobs).length;
+          
+          // Build progress bar
+          const progress = Math.round((completed / Math.max(total, 1)) * 100);
+          const progressBar = '█'.repeat(Math.floor(progress / 5)) + '░'.repeat(20 - Math.floor(progress / 5));
+          
+          // Build comment body
+          let body = `${COMMENT_IDENTIFIER}
+          ## 🚀 CI/CD Pipeline Status
+          
+          **Run:** [#${context.runNumber}](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})
+          **Workflow:** ${context.workflow}
+          **Commit:** ${context.sha.substring(0, 7)}
+          **Updated:** ${new Date().toLocaleTimeString('en-US', { timeZone: 'UTC', hour12: false })} UTC
+          
+          ### Progress
+          \`${progressBar}\` ${progress}% (${completed}/${total} jobs)
+          
+          ### Job Status
+          | Job | Status | Duration |
+          |-----|--------|----------|
+          `;
+          
+          // Add job rows
+          const jobOrder = [
+            'Fast Static Validation',
+            'validate-migrations', 
+            'validate-functions',
+            'validate-config',
+            'run-integration-tests',
+            'test-preview',
+            'enable-auto-merge',
+            'auto-merge'
+          ];
+          
+          // First add jobs in preferred order
+          for (const job of jobOrder) {
+            if (statusData.jobs[job]) {
+              const j = statusData.jobs[job];
+              body += `| ${job} | ${j.emoji} ${j.status} | ${j.duration || '-'} |\n`;
+            }
+          }
+          
+          // Then add any other jobs not in the list
+          for (const [job, j] of Object.entries(statusData.jobs)) {
+            if (!jobOrder.includes(job)) {
+              body += `| ${job} | ${j.emoji} ${j.status} | ${j.duration || '-'} |\n`;
+            }
+          }
+          
+          // Add errors section if any
+          if (Object.keys(statusData.errors).length > 0) {
+            body += `\n### ❌ Errors Detected\n\n`;
+            
+            for (const [job, jobErrors] of Object.entries(statusData.errors)) {
+              body += `<details>\n<summary>🔴 ${job} (${jobErrors.length} error${jobErrors.length > 1 ? 's' : ''})</summary>\n\n\`\`\`\n`;
+              
+              for (const error of jobErrors.slice(0, 5)) { // Limit to 5 errors per job
+                if (error.message) {
+                  body += `❌ ${error.message}\n`;
+                  if (error.file) {
+                    body += `   at ${error.file}${error.line ? ':' + error.line : ''}\n`;
+                  }
+                  if (error.suggestion) {
+                    body += `   💡 ${error.suggestion}\n`;
+                  }
+                  body += '\n';
+                }
+              }
+              
+              if (jobErrors.length > 5) {
+                body += `... and ${jobErrors.length - 5} more errors\n`;
+              }
+              
+              body += `\`\`\`\n</details>\n\n`;
+            }
+          }
+          
+          // Add summary
+          body += `\n### 📊 Summary\n`;
+          body += `- **Total Jobs:** ${total}\n`;
+          if (completed > 0) {
+            body += `- **Completed:** ${completed} (✅ ${completed - failed}, ❌ ${failed})\n`;
+          }
+          if (running > 0) {
+            body += `- **Running:** ${running}\n`;
+          }
+          
+          // Add helpful links
+          body += `\n---\n`;
+          body += `[View Logs](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}) | `;
+          body += `[Common Errors](.github/ci-reports/common-errors.md) | `;
+          body += `[Retry Failed Jobs](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})`;
+          
+          // Add hidden data for persistence
+          body += `\n<!-- status-data:${Buffer.from(JSON.stringify(statusData)).toString('base64')}-->`;
+          
+          // Ensure comment doesn't exceed GitHub's limit
+          if (body.length > MAX_COMMENT_SIZE) {
+            body = body.substring(0, MAX_COMMENT_SIZE - 100) + '\n\n... (truncated due to size limit)';
+          }
+          
+          // Create or update comment
+          try {
+            if (statusComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: statusComment.id,
+                body: body
+              });
+              console.log(`Updated status comment: ${statusComment.html_url}`);
+            } else {
+              const { data: newComment } = await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr_number,
+                body: body
+              });
+              console.log(`Created status comment: ${newComment.html_url}`);
+            }
+          } catch (error) {
+            console.error('Failed to update status comment:', error);
+            // Don't fail the job if comment update fails
+          }
