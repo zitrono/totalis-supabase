@@ -7,6 +7,10 @@ on:
       - '.github/workflows/validate.yml'
   workflow_call:  # Allow this workflow to be called by others
 
+permissions:
+  contents: read
+  pull-requests: write
+
 env:
   SUPABASE_CLI_VERSION: 2.23.4
 
@@ -17,6 +21,14 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+      
+      - name: Report Job Start
+        if: always()
+        uses: ./.github/actions/update-status
+        with:
+          job_name: 'validate-migrations'
+          status: 'in_progress'
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Check migration naming convention
         run: |
@@ -65,6 +77,14 @@ jobs:
             fi
           done
           echo "✅ SQL syntax validation passed"
+      
+      - name: Report Final Status
+        if: always()
+        uses: ./.github/actions/update-status
+        with:
+          job_name: 'validate-migrations'
+          status: ${{ job.status }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
   validate-functions:
     runs-on: ubuntu-latest
@@ -72,6 +92,14 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+      
+      - name: Report Job Start
+        if: always()
+        uses: ./.github/actions/update-status
+        with:
+          job_name: 'validate-functions'
+          status: 'in_progress'
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Deno
         uses: denoland/setup-deno@v1
@@ -141,6 +169,14 @@ jobs:
               fi
             fi
           done
+      
+      - name: Report Final Status
+        if: always()
+        uses: ./.github/actions/update-status
+        with:
+          job_name: 'validate-functions'
+          status: ${{ job.status }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
   validate-config:
     runs-on: ubuntu-latest
@@ -148,6 +184,14 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+      
+      - name: Report Job Start
+        if: always()
+        uses: ./.github/actions/update-status
+        with:
+          job_name: 'validate-config'
+          status: 'in_progress'
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Validate config.toml
         run: |
@@ -175,6 +219,14 @@ jobs:
             exit 1
           fi
           echo "✅ seed.sql exists"
+      
+      - name: Report Final Status
+        if: always()
+        uses: ./.github/actions/update-status
+        with:
+          job_name: 'validate-config'
+          status: ${{ job.status }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
   run-integration-tests:
     runs-on: ubuntu-latest
@@ -183,6 +235,14 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+      
+      - name: Report Job Start
+        if: always()
+        uses: ./.github/actions/update-status
+        with:
+          job_name: 'run-integration-tests'
+          status: 'in_progress'
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -203,4 +263,12 @@ jobs:
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           ENVIRONMENT: test
           NODE_ENV: test
+      
+      - name: Report Final Status
+        if: always()
+        uses: ./.github/actions/update-status
+        with:
+          job_name: 'run-integration-tests'
+          status: ${{ job.status }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 

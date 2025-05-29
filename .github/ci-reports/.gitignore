@@ -1,0 +1,9 @@
+# Ignore actual error reports
+*.json
+*.log
+*.html
+
+# Keep templates and documentation
+!error-schema.json
+!README.md
+!common-errors.md
