@@ -4,7 +4,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 import { corsHeaders } from "../_shared/cors.ts";
-import { getTestMetadata, mergeTestMetadata } from "../_shared/test-data.ts";
 import { createMonitoringContext } from "../_shared/monitoring.ts";
 
 serve(async (req) => {
@@ -13,8 +12,7 @@ serve(async (req) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
-  const testMetadata = getTestMetadata(req);
-  const monitoring = createMonitoringContext("recommendations", testMetadata);
+  const monitoring = createMonitoringContext("recommendations");
 
   try {
     // Get auth token
@@ -86,7 +84,7 @@ serve(async (req) => {
         importance: 4,
         relevance: 0.85,
         created_at: new Date().toISOString(),
-        metadata: mergeTestMetadata({}, testMetadata),
+        metadata: {},
       },
       {
         id: crypto.randomUUID(),
@@ -101,7 +99,7 @@ serve(async (req) => {
         importance: 3,
         relevance: 0.75,
         created_at: new Date().toISOString(),
-        metadata: mergeTestMetadata({}, testMetadata),
+        metadata: {},
       },
       {
         id: crypto.randomUUID(),
@@ -114,27 +112,24 @@ serve(async (req) => {
         relevance: 0.70,
         context: "Based on your recent check-ins",
         created_at: new Date().toISOString(),
-        metadata: mergeTestMetadata({}, testMetadata),
+        metadata: {},
       },
     ].slice(0, count);
 
-    // If this is a test, store recommendations in database
-    if (testMetadata) {
-      for (const rec of mockRecommendations) {
-        const { error } = await supabase
-          .from("recommendations")
-          .insert(rec);
+    // Store recommendations in database
+    for (const rec of mockRecommendations) {
+      const { error } = await supabase
+        .from("recommendations")
+        .insert(rec);
 
-        if (error) {
-          console.error("Failed to insert test recommendation:", error);
-        }
+      if (error) {
+        console.error("Failed to insert recommendation:", error);
       }
     }
 
     // Track success
     monitoring.trackSuccess(user.id, {
       recommendations_count: mockRecommendations.length,
-      is_test: !!testMetadata,
     });
 
     return new Response(

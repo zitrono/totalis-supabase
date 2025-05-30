@@ -7,7 +7,7 @@ import { corsHeaders } from "../_shared/cors.ts";
 import { getUserContext } from "../_shared/supabase-client.ts";
 import { LangflowClient } from "../_shared/langflow-client.ts";
 import { ChatMessage } from "../_shared/types.ts";
-import { getTestMetadata, mergeTestMetadata } from "../_shared/test-data.ts";
+// Test metadata utilities removed - test isolation handled by preview branches
 
 const langflowClient = new LangflowClient();
 
@@ -67,8 +67,6 @@ serve(async (req) => {
       conversationId = crypto.randomUUID(),
     } = await req.json();
 
-    // Get test metadata
-    const testMetadata = getTestMetadata(req);
 
     if (!message) {
       return new Response(
@@ -110,10 +108,10 @@ serve(async (req) => {
         role: "user",
         category_id: contextType === "category" ? contextId : null,
         conversation_id: conversationId,
-        metadata: mergeTestMetadata({
+        metadata: {
           context_type: contextType,
           context_id: contextId,
-        }, testMetadata),
+        },
         created_at: new Date().toISOString(),
       })
       .select()
@@ -143,10 +141,10 @@ serve(async (req) => {
         category_id: contextType === "category" ? contextId : null,
         conversation_id: conversationId,
         coach_id: context.coachId,
-        metadata: mergeTestMetadata({
+        metadata: {
           context_type: contextType,
           context_id: contextId,
-        }, testMetadata),
+        },
         created_at: new Date().toISOString(),
       })
       .select()

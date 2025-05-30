@@ -49,8 +49,7 @@ async function applyTestUsers() {
               password: 'Test123!@#',
               email_confirm: true,
               user_metadata: {
-                display_name: user.name,
-                test_account: true
+                display_name: user.name
               }
             });
 
@@ -65,8 +64,6 @@ async function applyTestUsers() {
                 .upsert({
                   id: newUser.user.id,
                   metadata: {
-                    test_account: true,
-                    permanent: true,
                     created_at: new Date().toISOString(),
                     email: user.email,
                     display_name: user.name
@@ -104,8 +101,6 @@ async function applyTestUsers() {
         const email = profile.metadata?.email || 'unknown';
         const name = profile.metadata?.display_name || 'unknown';
         console.log(`  - ${email} (${name})`);
-        console.log(`    Permanent: ${profile.metadata?.permanent || false}`);
-        console.log(`    Test Account: ${profile.metadata?.test_account || false}`);
       });
     }
 

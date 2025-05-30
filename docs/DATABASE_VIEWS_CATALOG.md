@@ -9,7 +9,6 @@ This document provides a complete catalog of all database views available in the
 4. [Check-in Views](#check-in-views)
 5. [Recommendation Views](#recommendation-views)
 6. [Analytics Views](#analytics-views)
-7. [Test Data Views](#test-data-views)
 
 ## User & Profile Views
 
@@ -512,53 +511,6 @@ ORDER BY usage_date DESC;
 
 **Mobile Usage**: Not typically used by mobile clients - admin only.
 
-## Test Data Views
-
-### 14. `test_data_summary`
-**Purpose**: Monitor test data accumulation across all tables.
-
-**Schema**:
-```sql
-WITH test_counts AS (
-  -- Aggregates test record counts from all tables
-  SELECT table_name, COUNT(*), MIN(created_at) as oldest_record
-  FROM each_table
-  WHERE metadata->>'test' = 'true'
-)
-SELECT 
-  table_name,
-  count,
-  oldest_record,
-  CASE 
-    WHEN oldest_record IS NOT NULL 
-    THEN NOW() - oldest_record 
-    ELSE NULL 
-  END as age
-FROM test_counts
-WHERE count > 0
-ORDER BY count DESC;
-```
-
-**Mobile Usage**: Used for test environment monitoring.
-
-```dart
-// In test environment only
-if (isTestEnvironment) {
-  final testData = await supabase
-    .from('test_data_summary')
-    .select();
-  
-  print('Test data summary:');
-  for (final table in testData) {
-    print('${table['table_name']}: ${table['count']} records');
-  }
-}
-```
-
-**Benefits**:
-- Monitors test data growth
-- Shows age of test records
-- Helps prevent data pollution
 
 ## Best Practices for Mobile Integration
 

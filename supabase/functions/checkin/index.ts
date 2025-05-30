@@ -4,7 +4,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 import { corsHeaders } from "../_shared/cors.ts";
-import { getTestMetadata, mergeTestMetadata } from "../_shared/test-data.ts";
 import { createMonitoringContext } from "../_shared/monitoring.ts";
 
 interface CheckinRequest {
@@ -35,8 +34,7 @@ serve(async (req) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
-  const testMetadata = getTestMetadata(req);
-  const monitoring = createMonitoringContext("checkin", testMetadata);
+  const monitoring = createMonitoringContext("checkin");
 
   try {
     // Get auth token
@@ -87,7 +85,6 @@ serve(async (req) => {
           supabase,
           user.id,
           body,
-          testMetadata,
           monitoring,
         );
         break;
@@ -141,7 +138,6 @@ async function startCheckin(
   supabase: any,
   userId: string,
   body: CheckinRequest,
-  testMetadata: any,
   monitoring: any,
 ) {
   // Support both camelCase and snake_case
@@ -224,9 +220,9 @@ async function startCheckin(
       category_id: categoryId,
       coach_id: profile?.coach_id || null,
       status: "in_progress",
-      metadata: mergeTestMetadata({
+      metadata: {
         template_questions: questions,
-      }, testMetadata),
+      },
     })
     .select()
     .single();
@@ -244,11 +240,11 @@ async function startCheckin(
       role: "assistant",
       content: questions[0].text,
       content_type: "checkin",
-      metadata: mergeTestMetadata({
+      metadata: {
         type: "start",
         checkin_id: checkIn.id,
         question_number: 1,
-      }, testMetadata),
+      },
     })
     .select()
     .single();

@@ -5,7 +5,6 @@ import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 import { corsHeaders } from "../_shared/cors.ts";
 import { createMonitoringContext } from "../_shared/monitoring.ts";
-import { getTestMetadata, mergeTestMetadata } from "../_shared/test-data.ts";
 
 const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB
 
@@ -55,8 +54,6 @@ serve(async (req) => {
       throw new Error("Invalid authentication");
     }
 
-    // Get test metadata
-    const testMetadata = getTestMetadata(req);
 
     // Parse multipart form data
     const formData = await req.formData();
@@ -106,12 +103,12 @@ serve(async (req) => {
           transcription: mockTranscription.text,
           duration: mockTranscription.duration,
           language: mockTranscription.language,
-          metadata: mergeTestMetadata({
+          metadata: {
             file_size: audioFile.size,
             file_type: audioFile.type,
             file_name: audioFile.name,
             mock: true,
-          }, testMetadata),
+          },
         })
         .select()
         .single();
@@ -174,11 +171,11 @@ serve(async (req) => {
         transcription: transcriptionResult.text,
         duration: transcriptionResult.duration || 0,
         language: transcriptionResult.language || "en",
-        metadata: mergeTestMetadata({
+        metadata: {
           file_size: audioFile.size,
           file_type: audioFile.type,
           file_name: audioFile.name,
-        }, testMetadata),
+        },
       })
       .select()
       .single();

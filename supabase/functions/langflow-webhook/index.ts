@@ -3,7 +3,6 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders } from "../_shared/cors.ts";
-import { getTestMetadata } from "../_shared/test-data.ts";
 
 serve(async (req) => {
   // Handle CORS
@@ -13,13 +12,10 @@ serve(async (req) => {
 
   try {
     const payload = await req.json();
-    const testMetadata = getTestMetadata(req);
 
     // Log webhook receipt
     console.log("Langflow webhook received:", {
       flowId: payload.flowId,
-      isTest: !!testMetadata,
-      testRunId: testMetadata?.test_run_id,
     });
 
     // Echo the payload back (mock implementation)
@@ -28,7 +24,6 @@ serve(async (req) => {
       received: true,
       echo: payload,
       timestamp: new Date().toISOString(),
-      ...(testMetadata && { testMetadata }),
     };
 
     return new Response(

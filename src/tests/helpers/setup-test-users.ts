@@ -8,9 +8,9 @@ interface TestUser {
 }
 
 const TEST_USERS: TestUser[] = [
-  { email: 'test1@totalis.app', password: 'Test123!@#', metadata: { test_account: true } },
-  { email: 'test2@totalis.app', password: 'Test123!@#', metadata: { test_account: true } },
-  { email: 'test3@totalis.app', password: 'Test123!@#', metadata: { test_account: true } }
+  { email: 'test1@totalis.app', password: 'Test123!@#' },
+  { email: 'test2@totalis.app', password: 'Test123!@#' },
+  { email: 'test3@totalis.app', password: 'Test123!@#' }
 ]
 
 export async function setupTestUsers(): Promise<void> {

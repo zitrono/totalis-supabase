@@ -132,7 +132,7 @@ BEGIN
         NOW(),
         NOW(),
         '{"provider":"email","providers":["email"]}',
-        '{"test_account":true}',
+        '{}',
         false,
         '',
         '',
@@ -167,13 +167,9 @@ BEGIN
       ) ON CONFLICT (provider, provider_id) DO NOTHING;
       
       -- Create profile (will be created automatically by trigger, but ensure it exists)
-      INSERT INTO profiles (id, coach_id, metadata) VALUES (
+      INSERT INTO profiles (id, coach_id) VALUES (
         test_user_id,
-        default_coach_id,
-        jsonb_build_object(
-          'test_account', true,
-          'created_via', 'seed'
-        )
+        default_coach_id
       ) ON CONFLICT (id) DO NOTHING;
       
     END LOOP;
