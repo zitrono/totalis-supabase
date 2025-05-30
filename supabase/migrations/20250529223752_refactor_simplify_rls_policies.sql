@@ -13,9 +13,9 @@ BEGIN
         WHERE schemaname = 'public'
         AND tablename IN (
             'profiles', 'coaches', 'categories', 'profile_categories',
-            'check_in_sessions', 'user_categories', 'messages',
-            'recommendations', 'user_recommendations', 'images',
-            'app_config', 'audio_transcriptions', 'account_links'
+            'user_categories', 'messages',
+            'recommendations', 'images',
+            'app_config', 'audio_transcriptions'
         )
     LOOP
         BEGIN
@@ -53,15 +53,7 @@ CREATE POLICY "users_can_view_own_categories" ON profile_categories
 CREATE POLICY "users_can_manage_own_categories" ON profile_categories
     FOR ALL USING (user_id = auth.uid());
 
--- Check-in sessions policies
-CREATE POLICY "users_can_view_own_checkins" ON check_in_sessions
-    FOR SELECT USING (user_id = auth.uid());
-
-CREATE POLICY "users_can_create_own_checkins" ON check_in_sessions
-    FOR INSERT WITH CHECK (user_id = auth.uid());
-
-CREATE POLICY "users_can_update_own_checkins" ON check_in_sessions
-    FOR UPDATE USING (user_id = auth.uid());
+-- Check-in sessions policies (skipped - table doesn't exist in production yet)
 
 -- User categories policies
 CREATE POLICY "users_can_view_own_user_categories" ON user_categories
@@ -87,12 +79,7 @@ CREATE POLICY "users_can_create_own_recommendations" ON recommendations
 CREATE POLICY "users_can_update_own_recommendations" ON recommendations
     FOR UPDATE USING (user_id = auth.uid());
 
--- User recommendations policies
-CREATE POLICY "users_can_view_own_user_recommendations" ON user_recommendations
-    FOR SELECT USING (user_id = auth.uid());
-
-CREATE POLICY "users_can_manage_own_user_recommendations" ON user_recommendations
-    FOR ALL USING (user_id = auth.uid());
+-- User recommendations policies (skipped - table doesn't exist in production yet)
 
 -- Images policies
 CREATE POLICY "authenticated_users_can_view_images" ON images
@@ -120,8 +107,8 @@ BEGIN
         WHERE schemaname = 'public'
         AND tablename IN (
             'profiles', 'coaches', 'categories', 'profile_categories',
-            'check_in_sessions', 'user_categories', 'messages',
-            'recommendations', 'user_recommendations', 'images',
+            'user_categories', 'messages',
+            'recommendations', 'images',
             'app_config', 'audio_transcriptions'
         )
     LOOP
