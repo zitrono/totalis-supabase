@@ -11,7 +11,7 @@ export interface CheckIn {
   id: string;
   userId: string;
   categoryId: string;
-  status: 'in_progress' | 'completed' | 'abandoned';
+  status: "in_progress" | "completed" | "abandoned";
   startedAt: string;
   completedAt?: string;
   responses?: CheckInResponse[];
@@ -43,13 +43,13 @@ export interface ChatMessage {
   message: string;
   isUser: boolean;
   timestamp: string;
-  contextType?: 'category' | 'checkin' | 'recommendation';
+  contextType?: "category" | "checkin" | "recommendation";
   contextId?: string;
 }
 
 export interface AnalyticsSummary {
   userId: string;
-  period: 'week' | 'month' | 'all';
+  period: "week" | "month" | "all";
   totalCheckIns: number;
   completedCheckIns: number;
   topCategories: CategoryStat[];
@@ -67,7 +67,7 @@ export interface CategoryStat {
 export interface LangflowRequest {
   prompt: string;
   context: Record<string, any>;
-  type: 'recommendation' | 'checkin' | 'chat' | 'analytics';
+  type: "recommendation" | "checkin" | "chat" | "analytics";
 }
 
 export interface LangflowResponse {

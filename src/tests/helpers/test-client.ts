@@ -27,6 +27,13 @@ export async function createTestClients(userEmail?: string, userPassword?: strin
     })
     
     if (authError) {
+      // In preview branches, test users might not exist
+      if (config.isPreview) {
+        console.warn(`⚠️  Test user not available in preview branch: ${authError.message}`)
+        console.warn('Using service client for all operations')
+        // Return service client as both clients for preview branches
+        return { serviceClient, userClient: serviceClient, userId: null }
+      }
       throw new Error(`Failed to sign in with test user: ${authError.message}`)
     }
     

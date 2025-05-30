@@ -4,12 +4,12 @@ export async function runNewUserScenario(client: TotalisTestClient) {
   console.log('\n🧪 Running New User Scenario...\n');
 
   try {
-    // Step 1: Anonymous sign-in
-    console.log('1. Signing in anonymously...');
-    const authResult = await client.signInAnonymously();
-    console.log(`   ✓ User created: ${authResult.user.id}`);
+    // Step 1: Sign in with test account
+    console.log('1. Signing in with test account...');
+    const authResult = await client.signInWithEmail('test1@totalis.app', 'Test123!@#');
+    console.log(`   ✓ User authenticated: ${authResult.user.id}`);
 
-    // Step 2: Create user profile
+    // Step 2: Profile is created automatically by trigger
     console.log('\n2. Creating user profile...');
     const profileData = {
       name: 'Test User',
