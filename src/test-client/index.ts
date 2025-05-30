@@ -41,8 +41,11 @@ export class TotalisTestClient {
   get supabase() { return this.supabaseClient; }
 
   // Authentication methods
-  async signInAnonymously() {
-    return this.authService.signInAnonymously();
+  // Anonymous authentication has been removed - use email/password or OAuth
+  async signInWithEmail(email: string, password: string) {
+    const { data, error } = await this.supabase.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    return { user: data.user!, session: data.session! };
   }
 
   async signInWithGoogle(email: string) {
@@ -186,7 +189,7 @@ export class TotalisTestClient {
     console.log('Starting new user flow...');
     
     // 1. Sign in anonymously
-    const authResult = await this.signInAnonymously();
+    const authResult = await this.signInWithEmail('test3@totalis.app', 'Test123!@#');
     console.log('✓ Signed in anonymously');
 
     // 2. Create user profile

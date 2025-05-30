@@ -4,22 +4,7 @@ import { User, AuthResponse } from '../types';
 export class TestAuthService {
   constructor(private supabase: SupabaseClient) {}
 
-  async signInAnonymously(): Promise<AuthResponse> {
-    const { data, error } = await this.supabase.auth.signInAnonymously();
-    
-    if (error) {
-      throw new Error(`Anonymous sign-in failed: ${error.message}`);
-    }
-
-    if (!data.user) {
-      throw new Error('No user returned from anonymous sign-in');
-    }
-
-    return {
-      user: this.mapUser(data.user),
-      session: data.session
-    };
-  }
+  // Anonymous authentication has been removed - use email/password or OAuth
 
   async signInWithGoogle(email: string): Promise<AuthResponse> {
     // For testing, we'll use email/password auth to simulate Google sign-in

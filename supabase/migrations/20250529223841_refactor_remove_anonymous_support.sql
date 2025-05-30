@@ -1,14 +1,17 @@
 -- Remove anonymous user support infrastructure
--- This migration removes all anonymous-specific functions, types, and tables
+-- This migration cleans up any remaining anonymous-specific elements
 
--- Drop the account_links table (used for anonymous->permanent account migration)
+-- Note: These items were already removed from the consolidated migration
+-- This migration ensures cleanup if upgrading from older schema
+
+-- Drop the account_links table if it exists (used for anonymous->permanent account migration)
 DROP TABLE IF EXISTS account_links CASCADE;
 
--- Drop the auth_type enum and check_auth_type function
+-- Drop the auth_type enum and check_auth_type function if they exist
 DROP FUNCTION IF EXISTS check_auth_type() CASCADE;
 DROP TYPE IF EXISTS auth_type CASCADE;
 
--- Drop the create_profile_if_needed function (no longer needed with trigger)
+-- Drop the create_profile_if_needed function if it exists (no longer needed with trigger)
 DROP FUNCTION IF EXISTS create_profile_if_needed() CASCADE;
 
 -- Update profile creation to remove anonymous user handling
