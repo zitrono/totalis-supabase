@@ -9,8 +9,8 @@ describe('Supabase Connection Tests', () => {
     expect(config.business.defaultCoach).toBe('Daniel');
   });
 
-  test('Anonymous client can connect', async () => {
-    // Test basic connection by checking auth
+  test('Public client can connect', async () => {
+    // Test basic connection using the anon key
     const { data, error } = await supabase.auth.getSession();
     
     // Should not error, but session should be null (not logged in)
@@ -52,6 +52,7 @@ describe('Supabase Connection Tests', () => {
 
   test('Business rules are configured', () => {
     expect(config.business.defaultCoach).toBe('Daniel');
+    // Anonymous users are no longer supported
     expect(config.business.anonymousUserExpiration).toBeNull();
     expect(config.business.voiceRecordingMaxSeconds).toBe(60);
     expect(config.business.checkInRules.aiDriven).toBe(true);
