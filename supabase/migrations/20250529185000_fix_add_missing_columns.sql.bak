@@ -43,19 +43,17 @@ CREATE INDEX IF NOT EXISTS idx_coaches_active ON coaches(is_active) WHERE is_act
 CREATE INDEX IF NOT EXISTS idx_categories_sort ON categories(sort_order, name);
 CREATE INDEX IF NOT EXISTS idx_recommendations_active ON recommendations(user_id, is_active) WHERE is_active = true;
 
--- Update RLS policies to match authenticated-only pattern
+-- Update RLS policies to match original schema
 
--- Coaches: Anyone can view active coaches
+-- Coaches: Anyone can view active coaches (not just all coaches)
 DROP POLICY IF EXISTS "Anyone can view coaches" ON coaches;
-DROP POLICY IF EXISTS "Anyone can view active coaches" ON coaches;
 CREATE POLICY "Anyone can view active coaches" ON coaches
-  FOR SELECT USING (is_active = true);
+  FOR SELECT USING (is_active = true OR check_auth_type() = 'service');
 
 -- App config: Anyone can view public config
 DROP POLICY IF EXISTS "Anyone can view config" ON app_config;
-DROP POLICY IF EXISTS "Anyone can view public config" ON app_config;
 CREATE POLICY "Anyone can view public config" ON app_config
-  FOR SELECT USING (is_public = true);
+  FOR SELECT USING (is_public = true OR check_auth_type() = 'service');
 
 -- Add comment explaining this migration
 COMMENT ON TABLE coaches IS 'Coaches table with is_active flag for soft deletes';
