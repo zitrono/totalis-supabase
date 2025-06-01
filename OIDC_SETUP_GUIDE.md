@@ -12,7 +12,7 @@ To enable OIDC authentication for publishing, you need to:
    - In the "Automated publishing" section
    - Click "Enable publishing from GitHub Actions"
    - Enter repository: `zitrono/totalis` 
-   - Set Tag-pattern to: `types-v{{version}}` (matches our git tags like `types-v1.0.100`)
+   - Set Tag-pattern to: `v{{version}}` (matches our git tags like `v1.0.100`)
    - Save changes
 
 3. **Repository Configuration**:
@@ -27,7 +27,7 @@ To enable OIDC authentication for publishing, you need to:
 
 - When we push to main with schema/function changes, workflow runs
 - Package is built with version `1.0.{build_number}`
-- Git tag `types-v1.0.{build_number}` is created
+- Git tag `v1.0.{build_number}` is created
 - OIDC authentication happens automatically
 - Package publishes to pub.dev
 

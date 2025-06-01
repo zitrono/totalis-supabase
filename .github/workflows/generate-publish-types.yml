@@ -146,8 +146,8 @@ jobs:
         run: |
           git config user.name github-actions
           git config user.email github-actions@github.com
-          git tag -a "types-v${{ steps.version.outputs.version }}" \
+          git tag -a "v${{ steps.version.outputs.version }}" \
             -m "Totalis Types v${{ steps.version.outputs.version }}"
-          git push origin "types-v${{ steps.version.outputs.version }}"
-          echo "✅ Tag created: types-v${{ steps.version.outputs.version }}"
+          git push origin "v${{ steps.version.outputs.version }}"
+          echo "✅ Tag created: v${{ steps.version.outputs.version }}"
           echo "📦 This will trigger OIDC publishing workflow automatically"
