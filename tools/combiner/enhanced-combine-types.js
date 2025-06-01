@@ -94,9 +94,7 @@ function enhancedCombineTypes(dbTypesPath, edgeFunctionTypesPath, outputPath, ve
 // SUPADART BASE CLASS
 // ======================
 abstract class SupadartClass<T> {
-  static String get table_name => throw UnimplementedError();
-  Map<String, dynamic> toJson();
-  T fromJson(Map<String, dynamic> json);
+  // Marker interface for supadart generated classes
 }
 
 // ======================
