@@ -174,7 +174,7 @@ jobs:
           
       - name: Publish Package to pub.dev with Personal Token
         env:
-          PUB_TOKEN: ${{ secrets.PUB_DEV_TOKEN }}
+          PUB_TOKEN: ${{ secrets.PUB_CREDENTIALS }}
         run: |
           cd publish/totalis_types
           echo "Publishing package to pub.dev using personal token v${{ steps.version.outputs.version }}..."
