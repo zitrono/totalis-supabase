@@ -83,31 +83,6 @@ jobs:
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           ENVIRONMENT: production
 
-      - name: Generate TypeScript types documentation
-        run: |
-          echo "📚 Generating TypeScript type documentation..."
-          
-          # Create docs directory if it doesn't exist
-          mkdir -p docs
-          
-          # Generate TypeScript types only (no db dump due to IPv6 issues)
-          echo "Generating TypeScript types..."
-          npx supabase gen types typescript --project-id ${{ secrets.SUPABASE_PROJECT_ID }} > docs/database.types.ts
-          
-          # Create a timestamp file to track when types were last generated
-          echo "Generated from production deployment on $(date -u '+%Y-%m-%d %H:%M:%S UTC')" > docs/types-generated.txt
-          echo "Commit: ${{ github.sha }}" >> docs/types-generated.txt
-          
-          echo "✅ TypeScript types generated successfully"
-
-      - name: Upload type documentation as artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: database-types
-          path: |
-            docs/database.types.ts
-            docs/types-generated.txt
-          retention-days: 30
 
       - name: Notify deployment status
         if: always()
