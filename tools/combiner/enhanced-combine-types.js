@@ -91,6 +91,15 @@ function enhancedCombineTypes(dbTypesPath, edgeFunctionTypesPath, outputPath, ve
 // Coverage: Database Tables + Views + Enums + Edge Functions
 
 // ======================
+// SUPADART BASE CLASS
+// ======================
+abstract class SupadartClass<T> {
+  static String get table_name => throw UnimplementedError();
+  Map<String, dynamic> toJson();
+  T fromJson(Map<String, dynamic> json);
+}
+
+// ======================
 // DATABASE ENUMS
 // ======================
 ${enums}

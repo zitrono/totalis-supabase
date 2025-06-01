@@ -100,7 +100,8 @@ jobs:
       - name: Calculate Version
         id: version
         run: |
-          VERSION="1.0.${{ github.run_number }}"
+          # Use run_number + 100 to ensure version is higher than 1.0.99
+          VERSION="1.0.$((100 + ${{ github.run_number }}))"
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Generated version: $VERSION"
           
