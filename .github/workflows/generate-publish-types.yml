@@ -172,7 +172,14 @@ jobs:
           flutter pub publish --dry-run
           echo "Dry run completed successfully"
           
-      - name: Create Git Tag (triggers OIDC publishing)
+      - name: Publish Package to pub.dev
+        run: |
+          cd publish/totalis_types
+          echo "Publishing package to pub.dev using OIDC v${{ steps.version.outputs.version }}..."
+          dart pub publish --force
+          echo "✅ Package published successfully"
+          
+      - name: Create Git Tag and Release
         run: |
           git config user.name github-actions
           git config user.email github-actions@github.com
@@ -180,4 +187,29 @@ jobs:
             -m "Totalis Types v${{ steps.version.outputs.version }}"
           git push origin "v${{ steps.version.outputs.version }}"
           echo "✅ Tag created: v${{ steps.version.outputs.version }}"
-          echo "📦 This will trigger OIDC publishing workflow automatically"
+          
+      - name: Create GitHub Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          release_name: Totalis Types v${{ steps.version.outputs.version }}
+          body: |
+            Automatically generated Totalis Types package
+            
+            Version: ${{ steps.version.outputs.version }}
+            Generated: ${{ github.event.head_commit.timestamp }}
+            
+            ### Changes
+            - Database schema types updated
+            - Edge function types updated  
+            - Package published to pub.dev
+            
+            ### Usage
+            ```yaml
+            dependencies:
+              totalis_types: ^${{ steps.version.outputs.version }}
+            ```
+          draft: false
+          prerelease: false
