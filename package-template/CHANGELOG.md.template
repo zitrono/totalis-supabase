@@ -1,0 +1,22 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+## [VERSION_PLACEHOLDER] - TIMESTAMP_PLACEHOLDER
+
+### Added
+- Auto-generated Supabase types for Totalis project
+- Database table, view, and enum types
+- Edge Function request/response types
+- JSON serialization support
+- DateTime conversion utilities
+
+### Features
+- Type-safe database operations
+- Null safety support
+- Automatic type generation from schema changes
+- Single unified types package
+
+---
+
+*This package is automatically generated. Version history tracks schema and function changes.*

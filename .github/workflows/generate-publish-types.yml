@@ -95,6 +95,14 @@ jobs:
           sed -i "s/VERSION_PLACEHOLDER/${{ steps.version.outputs.version }}/g" publish/totalis_types/README.md
           sed -i "s/TIMESTAMP_PLACEHOLDER/$(date -u +"%Y-%m-%dT%H:%M:%SZ")/g" publish/totalis_types/README.md
           
+          # Copy LICENSE
+          cp package-template/LICENSE.template publish/totalis_types/LICENSE
+          
+          # Copy and update CHANGELOG
+          envsubst < package-template/CHANGELOG.md.template > publish/totalis_types/CHANGELOG.md
+          sed -i "s/VERSION_PLACEHOLDER/${{ steps.version.outputs.version }}/g" publish/totalis_types/CHANGELOG.md
+          sed -i "s/TIMESTAMP_PLACEHOLDER/$(date -u +"%Y-%m-%dT%H:%M:%SZ")/g" publish/totalis_types/CHANGELOG.md
+          
       - name: Combine Types
         run: |
           node tools/combiner/combine-types.js \
@@ -103,15 +111,10 @@ jobs:
             publish/totalis_types/lib/totalis_types.dart \
             ${{ steps.version.outputs.version }}
             
-      - name: Generate Serialization
+      - name: Install Dependencies
         run: |
           cd publish/totalis_types
           flutter pub get
-          flutter pub run build_runner build --delete-conflicting-outputs
-          
-          # Remove dev dependencies to minimize package size
-          dart pub remove build_runner
-          dart pub remove json_serializable
           
       - name: Verify Package Size
         run: |
