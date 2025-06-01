@@ -1,0 +1,199 @@
+name: Publish Types Package (OIDC)
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write      # Required for OIDC authentication to pub.dev
+      contents: write      # To create releases
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.19.0'
+          
+      - name: Setup Dart
+        uses: dart-lang/setup-dart@v1
+        
+      - name: Install Global Dependencies
+        run: |
+          dart pub global activate supadart
+          
+      - name: Install Enum Extractor Dependencies
+        run: |
+          cd tools/enum-extractor
+          npm ci
+          
+      - name: Install Edge Function Parser Dependencies
+        run: |
+          cd tools/edge-function-parser
+          npm ci
+          
+      - name: Generate Database Types
+        env:
+          DATABASE_URL: postgresql://postgres:${{ secrets.SUPABASE_DB_PASSWORD }}@db.qdqbrqnqttyjegiupvri.supabase.co:5432/postgres
+          NODE_OPTIONS: --dns-result-order=ipv4first
+        run: |
+          mkdir -p temp/database
+          cd temp/database
+          
+          # Try auto-extraction with fallback to manual enums
+          echo "🔍 Attempting auto-extraction of enums from database..."
+          if node ../../tools/enum-extractor/extract-enums.js supadart.yaml; then
+            echo "✅ Auto-extraction successful!"
+          else
+            echo "⚠️ Auto-extraction failed, using manual enum specification..."
+            # Create enhanced supadart config with manually specified enums as fallback
+            cat > supadart.yaml << EOF
+          supabase_url: $SUPABASE_URL
+          supabase_anon_key: $SUPABASE_ANON_KEY
+          dart_format: true
+          output: .
+          separated: true
+          dart_class: true
+          include_views: true
+          include_enums: true
+          # Fallback manual enum definitions (validated locally)
+          enums:
+            # Core enums from database schema
+            sex: [male, female, non_binary, other, prefer_not_to_say]
+            role: [user, assistant, system, preassistant]
+            content_type: [text, voice, checkin, feedback]
+            message_type: [text, voice, image, system]
+            status: [started, in_progress, completed, abandoned]
+            recommendation_type: [action, category]
+            platform: [ios, android, web]
+            feedback_type: [rating, text, bug, suggestion]
+          EOF
+          fi
+          
+          # Generate complete database types with auto-extracted enums
+          echo "🚀 Generating database types..."
+          supadart
+            
+      - name: Build Edge Function Parser
+        run: |
+          cd tools/edge-function-parser
+          npm run build
+          
+      - name: Generate Edge Function Types
+        run: |
+          cd tools/edge-function-parser
+          # Use enhanced parser for complete interface extraction
+          node dist/enhanced-parser.js \
+            --input ../../supabase/functions \
+            --output ../../temp
+            
+      - name: Extract Version from Tag
+        id: version
+        run: |
+          TAG_NAME=${GITHUB_REF#refs/tags/}
+          VERSION=${TAG_NAME#v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
+          echo "Extracted version: $VERSION from tag: $TAG_NAME"
+          
+      - name: Prepare Package Directory
+        run: |
+          # Create clean package directory
+          mkdir -p publish/totalis_types/lib
+          
+          # Copy and update pubspec template
+          envsubst < package-template/pubspec.yaml.template > publish/totalis_types/pubspec.yaml
+          sed -i "s/VERSION_PLACEHOLDER/${{ steps.version.outputs.version }}/g" publish/totalis_types/pubspec.yaml
+          
+          # Copy and update README template
+          envsubst < package-template/README.md.template > publish/totalis_types/README.md
+          sed -i "s/VERSION_PLACEHOLDER/${{ steps.version.outputs.version }}/g" publish/totalis_types/README.md
+          sed -i "s/TIMESTAMP_PLACEHOLDER/$(date -u +"%Y-%m-%dT%H:%M:%SZ")/g" publish/totalis_types/README.md
+          
+          # Copy LICENSE
+          cp package-template/LICENSE.template publish/totalis_types/LICENSE
+          
+          # Copy and update CHANGELOG
+          envsubst < package-template/CHANGELOG.md.template > publish/totalis_types/CHANGELOG.md
+          sed -i "s/VERSION_PLACEHOLDER/${{ steps.version.outputs.version }}/g" publish/totalis_types/CHANGELOG.md
+          sed -i "s/TIMESTAMP_PLACEHOLDER/$(date -u +"%Y-%m-%dT%H:%M:%SZ")/g" publish/totalis_types/CHANGELOG.md
+          
+      - name: Combine Types
+        run: |
+          # Use enhanced combiner for complete type coverage
+          node tools/combiner/enhanced-combine-types.js \
+            temp/database \
+            temp/edge_function_types.dart \
+            publish/totalis_types/lib/totalis_types.dart \
+            ${{ steps.version.outputs.version }}
+            
+      - name: Install Dependencies
+        run: |
+          cd publish/totalis_types
+          flutter pub get
+          
+      - name: Verify Package Size
+        run: |
+          cd publish/totalis_types
+          SIZE=$(du -sk . | cut -f1)
+          echo "Package size: ${SIZE}KB"
+          if [ $SIZE -gt 500 ]; then
+            echo "⚠️ WARNING: Package size exceeds 500KB"
+          else
+            echo "✅ Package size is acceptable"
+          fi
+          
+      - name: Dry Run Publish
+        run: |
+          cd publish/totalis_types
+          echo "Running dry run publish..."
+          flutter pub publish --dry-run
+          echo "Dry run completed successfully"
+          
+      - name: Publish Package to pub.dev (OIDC)
+        run: |
+          cd publish/totalis_types
+          echo "Publishing package to pub.dev using OIDC from tag ${{ steps.version.outputs.tag_name }}..."
+          dart pub publish --force
+          echo "✅ Package published successfully"
+          
+      - name: Create GitHub Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.version.outputs.tag_name }}
+          release_name: Totalis Types v${{ steps.version.outputs.version }}
+          body: |
+            Automatically generated Totalis Types package
+            
+            Version: ${{ steps.version.outputs.version }}
+            Generated: ${{ github.event.head_commit.timestamp }}
+            
+            ### Changes
+            - Database schema types updated
+            - Edge function types updated  
+            - Package published to pub.dev
+            
+            ### Usage
+            ```yaml
+            dependencies:
+              totalis_types: ^${{ steps.version.outputs.version }}
+            ```
+          draft: false
+          prerelease: false
