@@ -162,9 +162,9 @@ jobs:
           
       - name: Configure pub.dev credentials
         run: |
-          mkdir -p ~/.config/dart
-          echo '${{ secrets.PUB_CREDENTIALS }}' > ~/.config/dart/pub-credentials.json
-          echo "✅ Pub credentials configured"
+          mkdir -p ~/.pub-cache
+          echo '${{ secrets.PUB_CREDENTIALS }}' > ~/.pub-cache/credentials.json
+          echo "✅ Pub credentials configured in legacy location"
           
       - name: Dry Run Publish
         run: |
