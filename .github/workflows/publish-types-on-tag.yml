@@ -37,48 +37,29 @@ jobs:
         run: |
           dart pub global activate supadart
           
+      - name: Install Enum Extractor Dependencies
+        run: |
+          cd tools/enum-extractor
+          npm ci
+          
       - name: Install Edge Function Parser Dependencies
         run: |
           cd tools/edge-function-parser
           npm ci
           
       - name: Generate Database Types
+        env:
+          DATABASE_URL: postgresql://postgres:${{ secrets.SUPABASE_DB_PASSWORD }}@db.qdqbrqnqttyjegiupvri.supabase.co:5432/postgres
         run: |
           mkdir -p temp/database
           cd temp/database
           
-          # Create enhanced supadart config with complete enum coverage (validated locally)
-          cat > supadart.yaml << EOF
-          supabase_url: $SUPABASE_URL
-          supabase_anon_key: $SUPABASE_ANON_KEY
-          dart_format: true
-          output: .
-          separated: true
-          dart_class: true
-          include_views: true
-          include_enums: true
-          # Complete enum definitions from database schema
-          enums:
-            # From coaches and profiles tables
-            sex: [male, female, non_binary, other, prefer_not_to_say]
-            # From messages table  
-            role: [user, assistant, system]
-            content_type: [text, voice, checkin, feedback]
-            # From check_ins table
-            status: [active, completed, abandoned]
-            # From recommendations table
-            recommendation_type: [action, category, insight]
-            # From user_recommendations table
-            interaction_type: [viewed, liked, dismissed, saved]
-            # From analytics_events table
-            platform: [ios, android, web]
-            # From audio_transcriptions table
-            transcription_status: [pending, processing, completed, failed]
-            # From system_logs table
-            log_level: [debug, info, warning, error]
-          EOF
+          # Auto-extract enums from database schema using enhanced extractor
+          echo "🔍 Auto-extracting enums from database..."
+          node ../../tools/enum-extractor/extract-enums.js supadart.yaml
           
-          # Generate complete database types
+          # Generate complete database types with auto-extracted enums
+          echo "🚀 Generating database types..."
           supadart
             
       - name: Build Edge Function Parser

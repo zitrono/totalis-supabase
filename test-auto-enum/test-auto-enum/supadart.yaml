@@ -1,0 +1,8 @@
+supabase_url: https://qdqbrqnqttyjegiupvri.supabase.co
+supabase_anon_key: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcWJycW5xdHR5amVnaXVwdnJpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTY4NTI4MzQsImV4cCI6MjAzMjQyODgzNH0.e90n6jU3-5vr6tCVk2dRZsGNNcz1RgFHV8xHGJkEg5U
+dart_format: true
+output: .
+separated: true
+dart_class: true
+include_views: true
+include_enums: true

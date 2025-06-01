@@ -1,0 +1,19 @@
+{
+  "name": "supabase-enum-extractor",
+  "version": "1.0.0",
+  "description": "PostgreSQL enum extractor for Supadart configuration",
+  "main": "extract-enums.js",
+  "scripts": {
+    "extract": "node extract-enums.js",
+    "test": "node test-extraction.js"
+  },
+  "dependencies": {
+    "pg": "^8.11.3",
+    "js-yaml": "^4.1.0"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "author": "Totalis Project",
+  "license": "MIT"
+}
