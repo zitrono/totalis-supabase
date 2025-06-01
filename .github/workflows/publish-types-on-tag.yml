@@ -47,7 +47,7 @@ jobs:
           mkdir -p temp/database
           cd temp/database
           
-          # Create enhanced supadart config with complete enum coverage
+          # Create enhanced supadart config with complete enum coverage (validated locally)
           cat > supadart.yaml << EOF
           supabase_url: $SUPABASE_URL
           supabase_anon_key: $SUPABASE_ANON_KEY
