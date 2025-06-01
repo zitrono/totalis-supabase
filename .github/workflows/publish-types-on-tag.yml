@@ -47,7 +47,7 @@ jobs:
           mkdir -p temp/database
           cd temp/database
           
-          # Create supadart config
+          # Create enhanced supadart config with complete enum coverage
           cat > supadart.yaml << EOF
           supabase_url: $SUPABASE_URL
           supabase_anon_key: $SUPABASE_ANON_KEY
@@ -57,9 +57,28 @@ jobs:
           dart_class: true
           include_views: true
           include_enums: true
+          # Complete enum definitions from database schema
+          enums:
+            # From coaches and profiles tables
+            sex: [male, female, non_binary, other, prefer_not_to_say]
+            # From messages table  
+            role: [user, assistant, system]
+            content_type: [text, voice, checkin, feedback]
+            # From check_ins table
+            status: [active, completed, abandoned]
+            # From recommendations table
+            recommendation_type: [action, category, insight]
+            # From user_recommendations table
+            interaction_type: [viewed, liked, dismissed, saved]
+            # From analytics_events table
+            platform: [ios, android, web]
+            # From audio_transcriptions table
+            transcription_status: [pending, processing, completed, failed]
+            # From system_logs table
+            log_level: [debug, info, warning, error]
           EOF
           
-          # Generate types
+          # Generate complete database types
           supadart
             
       - name: Build Edge Function Parser
@@ -70,7 +89,8 @@ jobs:
       - name: Generate Edge Function Types
         run: |
           cd tools/edge-function-parser
-          node dist/parser.js \
+          # Use enhanced parser for complete interface extraction
+          node dist/enhanced-parser.js \
             --input ../../supabase/functions \
             --output ../../temp
             
@@ -107,7 +127,8 @@ jobs:
           
       - name: Combine Types
         run: |
-          node tools/combiner/combine-types.js \
+          # Use enhanced combiner for complete type coverage
+          node tools/combiner/enhanced-combine-types.js \
             temp/database \
             temp/edge_function_types.dart \
             publish/totalis_types/lib/totalis_types.dart \
