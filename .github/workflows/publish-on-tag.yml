@@ -1,0 +1,51 @@
+name: Publish Types Package (Tag Only)
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write      # Required for OIDC authentication to pub.dev
+      contents: write      # To create releases
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.19.0'
+          
+      - name: Setup Dart
+        uses: dart-lang/setup-dart@v1
+        
+      - name: Extract Version from Tag
+        id: version
+        run: |
+          TAG_NAME=${GITHUB_REF#refs/tags/}
+          VERSION=${TAG_NAME#v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
+          echo "Extracted version: $VERSION from tag: $TAG_NAME"
+          
+      - name: Create minimal package for testing
+        run: |
+          mkdir -p publish/totalis_types/lib
+          echo "name: totalis_types" > publish/totalis_types/pubspec.yaml
+          echo "version: ${{ steps.version.outputs.version }}" >> publish/totalis_types/pubspec.yaml
+          echo "description: Auto-generated Supabase types for Totalis project" >> publish/totalis_types/pubspec.yaml
+          echo "environment:" >> publish/totalis_types/pubspec.yaml
+          echo "  sdk: '>=3.0.0 <4.0.0'" >> publish/totalis_types/pubspec.yaml
+          echo "// Test types for v${{ steps.version.outputs.version }}" > publish/totalis_types/lib/totalis_types.dart
+          
+      - name: Publish Package to pub.dev (OIDC)
+        run: |
+          cd publish/totalis_types
+          echo "Publishing package to pub.dev using OIDC from tag ${{ steps.version.outputs.tag_name }}..."
+          dart pub publish --force
+          echo "✅ Package published successfully"
