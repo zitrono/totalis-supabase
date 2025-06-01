@@ -162,8 +162,8 @@ jobs:
           
       - name: Configure pub.dev credentials
         run: |
-          mkdir -p "$XDG_CONFIG_HOME/dart"
-          echo '${{ secrets.PUB_CREDENTIALS }}' > "$XDG_CONFIG_HOME/dart/pub-credentials.json"
+          mkdir -p ~/.config/dart
+          echo '${{ secrets.PUB_CREDENTIALS }}' > ~/.config/dart/pub-credentials.json
           echo "✅ Pub credentials configured"
           
       - name: Dry Run Publish
