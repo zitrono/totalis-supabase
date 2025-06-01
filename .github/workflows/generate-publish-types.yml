@@ -15,6 +15,9 @@ env:
 jobs:
   generate-and-publish:
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write      # Required for OIDC authentication to pub.dev
+      contents: write      # To create tags and releases
     
     steps:
       - name: Checkout repository
@@ -127,12 +130,10 @@ jobs:
             echo "✅ Package size is acceptable"
           fi
           
-      - name: Setup Pub Credentials
+      - name: Configure pub.dev credentials (OIDC)
         run: |
-          mkdir -p ~/.pub-cache
-          echo '${{ secrets.PUB_CREDENTIALS }}' > ~/.pub-cache/credentials.json
-          ls -la ~/.pub-cache/
-          echo "Credentials file size: $(wc -c < ~/.pub-cache/credentials.json)"
+          echo "Using OIDC authentication for pub.dev publishing"
+          echo "No manual credential setup required"
           
       - name: Dry Run Publish
         run: |
@@ -141,19 +142,11 @@ jobs:
           flutter pub publish --dry-run
           echo "Dry run completed successfully"
           
-      - name: Publish Package
-        timeout-minutes: 3
+      - name: Publish Package to pub.dev
         run: |
           cd publish/totalis_types
-          echo "Publishing package to pub.dev..."
-          
-          # Try publishing with explicit verbose output
-          dart pub publish --force --verbose || {
-            echo "❌ Publish failed, trying once more..."
-            sleep 30
-            dart pub publish --force --verbose
-          }
-          
+          echo "Publishing package to pub.dev using OIDC..."
+          dart pub publish --force
           echo "✅ Package published successfully"
           
       - name: Create Git Tag
