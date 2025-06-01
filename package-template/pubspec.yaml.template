@@ -1,7 +1,7 @@
 name: totalis_types
 description: Auto-generated Supabase types for Totalis project
 version: VERSION_PLACEHOLDER
-publish_to: https://pub.dev
+# publish_to: 'none' # Remove this line to publish to pub.dev
 
 repository: https://github.com/zitrono/totalis
 homepage: https://github.com/zitrono/totalis
