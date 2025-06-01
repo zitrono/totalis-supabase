@@ -1,0 +1,9 @@
+supabase_url: $SUPABASE_URL
+supabase_anon_key: $SUPABASE_ANON_KEY
+dart_format: true
+output: .
+separated: true
+dart_class: true
+include_views: true
+include_enums: true
+EOF < /dev/null

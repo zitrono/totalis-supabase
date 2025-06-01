@@ -1,0 +1,27 @@
+supabase_url: https://qdqbrqnqttyjegiupvri.supabase.co
+supabase_anon_key: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcWJycW5xdHR5amVnaXVwdnJpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTY4NTI4MzQsImV4cCI6MjAzMjQyODgzNH0.e90n6jU3-5vr6tCVk2dRZsGNNcz1RgFHV8xHGJkEg5U
+dart_format: true
+output: ./test-types
+separated: true
+dart_class: true
+include_views: true
+include_enums: true
+# Add all database enums identified from schema
+enums:
+  # From coaches and profiles tables
+  sex: [male, female, non_binary, other, prefer_not_to_say]
+  # From messages table  
+  role: [user, assistant, system]
+  content_type: [text, voice, checkin, feedback]
+  # From check_ins table
+  status: [active, completed, abandoned]
+  # From recommendations table
+  recommendation_type: [action, category, insight]
+  # From user_recommendations table
+  interaction_type: [viewed, liked, dismissed, saved]
+  # From analytics_events table
+  platform: [ios, android, web]
+  # From audio_transcriptions table
+  transcription_status: [pending, processing, completed, failed]
+  # From system_logs table
+  log_level: [debug, info, warning, error]

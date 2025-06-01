@@ -1,0 +1,17 @@
+{
+  "configVersion": 2,
+  "packages": [
+    {
+      "name": "totalis_types",
+      "rootUri": "../",
+      "packageUri": "lib/",
+      "languageVersion": "3.0"
+    }
+  ],
+  "generated": "2025-06-01T08:47:23.399458Z",
+  "generator": "pub",
+  "generatorVersion": "3.6.1",
+  "flutterRoot": "file:///Users/zitrono/flutter",
+  "flutterVersion": "3.27.2",
+  "pubCache": "file:///Users/zitrono/.pub-cache"
+}
