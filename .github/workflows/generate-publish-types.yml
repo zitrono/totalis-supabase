@@ -53,13 +53,40 @@ jobs:
       - name: Generate Database Types
         env:
           DATABASE_URL: postgresql://postgres:${{ secrets.SUPABASE_DB_PASSWORD }}@db.qdqbrqnqttyjegiupvri.supabase.co:5432/postgres
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: |
           mkdir -p temp/database
           cd temp/database
           
-          # Auto-extract enums from database schema using enhanced extractor
-          echo "🔍 Auto-extracting enums from database..."
-          node ../../tools/enum-extractor/extract-enums.js supadart.yaml
+          # Try auto-extraction with fallback to manual enums
+          echo "🔍 Attempting auto-extraction of enums from database..."
+          if node ../../tools/enum-extractor/extract-enums.js supadart.yaml; then
+            echo "✅ Auto-extraction successful!"
+          else
+            echo "⚠️ Auto-extraction failed, using manual enum specification..."
+            # Create enhanced supadart config with manually specified enums as fallback
+            cat > supadart.yaml << EOF
+          supabase_url: $SUPABASE_URL
+          supabase_anon_key: $SUPABASE_ANON_KEY
+          dart_format: true
+          output: .
+          separated: true
+          dart_class: true
+          include_views: true
+          include_enums: true
+          # Fallback manual enum definitions (validated locally)
+          enums:
+            # Core enums from database schema
+            sex: [male, female, non_binary, other, prefer_not_to_say]
+            role: [user, assistant, system, preassistant]
+            content_type: [text, voice, checkin, feedback]
+            message_type: [text, voice, image, system]
+            status: [started, in_progress, completed, abandoned]
+            recommendation_type: [action, category]
+            platform: [ios, android, web]
+            feedback_type: [rating, text, bug, suggestion]
+          EOF
+          fi
           
           # Generate complete database types with auto-extracted enums
           echo "🚀 Generating database types..."

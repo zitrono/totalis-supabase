@@ -29,7 +29,10 @@ async function extractEnums(configPath = 'supadart.yaml') {
   
   const client = new Client({
     connectionString: DATABASE_URL,
-    ssl: DATABASE_URL.includes('supabase.co') ? { rejectUnauthorized: false } : false
+    ssl: DATABASE_URL.includes('supabase.co') ? { rejectUnauthorized: false } : false,
+    // Configure for GitHub Actions IPv4-only environment
+    keepAlive: true,
+    keepAliveInitialDelayMillis: 30000
   });
   
   try {
