@@ -131,16 +131,30 @@ jobs:
         run: |
           mkdir -p ~/.pub-cache
           echo '${{ secrets.PUB_CREDENTIALS }}' > ~/.pub-cache/credentials.json
+          ls -la ~/.pub-cache/
+          echo "Credentials file size: $(wc -c < ~/.pub-cache/credentials.json)"
           
       - name: Dry Run Publish
         run: |
           cd publish/totalis_types
+          echo "Running dry run publish..."
           flutter pub publish --dry-run
+          echo "Dry run completed successfully"
           
       - name: Publish Package
+        timeout-minutes: 3
         run: |
           cd publish/totalis_types
-          flutter pub publish --force
+          echo "Publishing package to pub.dev..."
+          
+          # Try publishing with explicit verbose output
+          dart pub publish --force --verbose || {
+            echo "❌ Publish failed, trying once more..."
+            sleep 30
+            dart pub publish --force --verbose
+          }
+          
+          echo "✅ Package published successfully"
           
       - name: Create Git Tag
         run: |
