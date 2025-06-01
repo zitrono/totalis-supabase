@@ -18,9 +18,8 @@ Based on my deep code review of both backend and frontend, here's what backend f
 - `variables` - System variables
 
 ### ❌ Missing/Needs Enhancement:
-1. **Account Merging** - Logic to merge anonymous accounts to Google accounts
-2. **Check Lists** - The mobile app references check_lists functionality not in current schema
-3. **User Stats Aggregation** - The `user_stats` view mentioned in migration plan doesn't exist
+1. **Check Lists** - The mobile app references check_lists functionality not in current schema
+2. **User Stats Aggregation** - The `user_stats` view mentioned in migration plan doesn't exist
 
 ## 🔧 Edge Functions Requirements
 
@@ -42,8 +41,7 @@ Based on my deep code review of both backend and frontend, here's what backend f
    - Need to clarify if pass-through is sufficient
 
 ### ❌ Missing Functions:
-1. **Account Merge Function** - Handle anonymous → Google account linking
-2. **Batch Operations** - Mobile app might benefit from batch APIs for:
+1. **Batch Operations** - Mobile app might benefit from batch APIs for:
    - Multiple category updates
    - Bulk recommendation fetching
    - Batch message loading
@@ -78,14 +76,12 @@ Based on my deep code review of both backend and frontend, here's what backend f
 
 ### ✅ Implemented:
 - Google OAuth provider configuration
-- Anonymous authentication support
 - JWT token validation
 - Profile auto-creation triggers
 
 ### ❌ Missing:
-1. **Account Merging** - Anonymous → OAuth linking
-2. **Deep Link Handling** - `com.totalis.app://auth` redirect configuration
-3. **Rate Limit Management** - Mobile-specific rate limits
+1. **Deep Link Handling** - `com.totalis.app://auth` redirect configuration
+2. **Rate Limit Management** - Mobile-specific rate limits
 
 ## 💾 Data Migration Requirements
 
@@ -117,8 +113,7 @@ CREATE INDEX idx_checkins_user_category ON check_ins(user_id, category_id);
 ### Phase 1: Critical Missing Pieces (Day 1-2)
 1. Create `user_stats` view for analytics
 2. Create `user_audio_usage` view if needed
-3. Implement account merge functionality
-4. Add missing database indexes
+3. Add missing database indexes
 
 ### Phase 2: Edge Function Alignment (Day 3-4)
 1. Update `checkin-process` to handle all actions (start/answer/complete/abandon)
@@ -153,10 +148,6 @@ LEFT JOIN messages m ON m.user_id = p.user_id
 GROUP BY p.user_id;
 ```
 
-### 3. Add Account Merge Edge Function:
-- Handle anonymous → OAuth transitions
-- Preserve user data during merge
-- Update all foreign key references
 
 ### 4. Optimize for Direct Access:
 - Ensure all operations can be done via Supabase SDK
@@ -167,7 +158,6 @@ GROUP BY p.user_id;
 
 The backend is **90% ready** for the mobile migration. The main gaps are:
 - Missing views (`user_stats`, `user_audio_usage`)
-- Account merging logic for anonymous → OAuth
 - Edge function alignment (unified checkin-process)
 - Performance optimizations (indexes, RLS policies)
 

@@ -1,0 +1,166 @@
+name: Generate and Publish Totalis Types
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/migrations/**'
+      - 'supabase/functions/**'
+  workflow_dispatch:
+
+env:
+  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+
+jobs:
+  generate-and-publish:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.19.0'
+          
+      - name: Setup Dart
+        uses: dart-lang/setup-dart@v1
+        
+      - name: Install Global Dependencies
+        run: |
+          dart pub global activate supadart
+          
+      - name: Install Edge Function Parser Dependencies
+        run: |
+          cd tools/edge-function-parser
+          npm ci
+          
+      - name: Generate Database Types
+        run: |
+          mkdir -p temp/database
+          supadart \
+            --url $SUPABASE_URL \
+            --key $SUPABASE_ANON_KEY \
+            --output temp/database \
+            --separated \
+            --dart-class \
+            --include-views \
+            --include-enums
+            
+      - name: Build Edge Function Parser
+        run: |
+          cd tools/edge-function-parser
+          npm run build
+          
+      - name: Generate Edge Function Types
+        run: |
+          cd tools/edge-function-parser
+          node dist/parser.js \
+            --input ../../supabase/functions \
+            --output ../../temp
+            
+      - name: Calculate Version
+        id: version
+        run: |
+          VERSION="1.0.${{ github.run_number }}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Generated version: $VERSION"
+          
+      - name: Prepare Package Directory
+        run: |
+          # Create clean package directory
+          mkdir -p publish/totalis_types/lib
+          
+          # Copy and update pubspec template
+          envsubst < package-template/pubspec.yaml.template > publish/totalis_types/pubspec.yaml
+          sed -i "s/VERSION_PLACEHOLDER/${{ steps.version.outputs.version }}/g" publish/totalis_types/pubspec.yaml
+          
+          # Copy and update README template
+          envsubst < package-template/README.md.template > publish/totalis_types/README.md
+          sed -i "s/VERSION_PLACEHOLDER/${{ steps.version.outputs.version }}/g" publish/totalis_types/README.md
+          sed -i "s/TIMESTAMP_PLACEHOLDER/$(date -u +"%Y-%m-%dT%H:%M:%SZ")/g" publish/totalis_types/README.md
+          
+      - name: Combine Types
+        run: |
+          node tools/combiner/combine-types.js \
+            temp/database \
+            temp/edge_function_types.dart \
+            publish/totalis_types/lib/totalis_types.dart \
+            ${{ steps.version.outputs.version }}
+            
+      - name: Generate Serialization
+        run: |
+          cd publish/totalis_types
+          flutter pub get
+          flutter pub run build_runner build --delete-conflicting-outputs
+          
+          # Remove dev dependencies to minimize package size
+          dart pub remove build_runner
+          dart pub remove json_serializable
+          
+      - name: Verify Package Size
+        run: |
+          cd publish/totalis_types
+          SIZE=$(du -sk . | cut -f1)
+          echo "Package size: ${SIZE}KB"
+          if [ $SIZE -gt 500 ]; then
+            echo "⚠️ WARNING: Package size exceeds 500KB"
+          else
+            echo "✅ Package size is acceptable"
+          fi
+          
+      - name: Setup Pub Credentials
+        run: |
+          mkdir -p ~/.pub-cache
+          echo '${{ secrets.PUB_CREDENTIALS }}' > ~/.pub-cache/credentials.json
+          
+      - name: Dry Run Publish
+        run: |
+          cd publish/totalis_types
+          flutter pub publish --dry-run
+          
+      - name: Publish Package
+        run: |
+          cd publish/totalis_types
+          flutter pub publish --force
+          
+      - name: Create Git Tag
+        run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git tag -a "types-v${{ steps.version.outputs.version }}" \
+            -m "Totalis Types v${{ steps.version.outputs.version }}"
+          git push origin "types-v${{ steps.version.outputs.version }}"
+          
+      - name: Create GitHub Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: types-v${{ steps.version.outputs.version }}
+          release_name: Totalis Types v${{ steps.version.outputs.version }}
+          body: |
+            Automatically generated Totalis Types package
+            
+            Version: ${{ steps.version.outputs.version }}
+            Generated: ${{ github.event.head_commit.timestamp }}
+            
+            ### Changes
+            - Database schema types updated
+            - Edge function types updated  
+            - Package published to pub.dev
+            
+            ### Usage
+            ```yaml
+            dependencies:
+              totalis_types: ^${{ steps.version.outputs.version }}
+            ```
+          draft: false
+          prerelease: false

@@ -1,0 +1,60 @@
+# Totalis Types
+
+Auto-generated Supabase types for the Totalis project.
+
+Version: VERSION_PLACEHOLDER
+Generated: TIMESTAMP_PLACEHOLDER
+
+## Usage
+
+Add to your `pubspec.yaml`:
+
+```yaml
+dependencies:
+  totalis_types: ^VERSION_PLACEHOLDER
+```
+
+Import in your Dart code:
+
+```dart
+import 'package:totalis_types/totalis_types.dart';
+```
+
+## Features
+
+- ✅ Database table types with null safety
+- ✅ Database view types  
+- ✅ Database enum types
+- ✅ Edge Function request/response types
+- ✅ JSON serialization support
+- ✅ Automatic type generation from schema changes
+
+## Generated Types Include
+
+### Database Types
+- All table models with proper typing
+- Database views for complex queries  
+- Enum types for constrained values
+
+### Edge Function Types
+- Request types for function inputs
+- Response types for function outputs
+- Shared types used across functions
+
+## Utilities
+
+Built-in converters for common types:
+- `DateTimeConverter` - for non-nullable DateTime fields
+- `DateTimeNullableConverter` - for nullable DateTime fields
+
+## Version Info
+
+Access version information:
+```dart
+print(totalisTypesVersion); // Current package version
+print(generatedAt); // Generation timestamp
+```
+
+---
+
+*This package is automatically generated. Do not edit manually.*
