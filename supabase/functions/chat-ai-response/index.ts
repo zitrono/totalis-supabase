@@ -170,7 +170,7 @@ serve(async (req) => {
         aiMessage: aiMessage,
         coach: coach,
         contextUsed: contextType,
-        metadata: testMetadata,
+        metadata: {},
       }),
       {
         headers: {
