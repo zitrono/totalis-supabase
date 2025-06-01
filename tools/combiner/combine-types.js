@@ -69,24 +69,13 @@ ${extractContent(dbViews)}
 ${extractContent(edgeTypes)}
 
 // Utilities
-class DateTimeConverter implements JsonConverter<DateTime, String> {
-  const DateTimeConverter();
+class DateTimeUtils {
+  static DateTime fromJson(String json) => DateTime.parse(json);
+  static String toJson(DateTime object) => object.toIso8601String();
   
-  @override
-  DateTime fromJson(String json) => DateTime.parse(json);
-  
-  @override
-  String toJson(DateTime object) => object.toIso8601String();
-}
-
-class DateTimeNullableConverter implements JsonConverter<DateTime?, String?> {
-  const DateTimeNullableConverter();
-  
-  @override
-  DateTime? fromJson(String? json) => json != null ? DateTime.parse(json) : null;
-  
-  @override
-  String? toJson(DateTime? object) => object?.toIso8601String();
+  static DateTime? fromJsonNullable(String? json) => 
+    json != null ? DateTime.parse(json) : null;
+  static String? toJsonNullable(DateTime? object) => object?.toIso8601String();
 }
 
 // Version info
