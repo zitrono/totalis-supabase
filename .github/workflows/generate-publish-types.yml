@@ -160,10 +160,11 @@ jobs:
             echo "✅ Package size is acceptable"
           fi
           
-      - name: Configure pub.dev credentials (OIDC)
+      - name: Configure pub.dev credentials
         run: |
-          echo "Using OIDC authentication for pub.dev publishing"
-          echo "No manual credential setup required"
+          mkdir -p "$XDG_CONFIG_HOME/dart"
+          echo '${{ secrets.PUB_CREDENTIALS }}' > "$XDG_CONFIG_HOME/dart/pub-credentials.json"
+          echo "✅ Pub credentials configured"
           
       - name: Dry Run Publish
         run: |
@@ -172,12 +173,10 @@ jobs:
           flutter pub publish --dry-run
           echo "Dry run completed successfully"
           
-      - name: Publish Package to pub.dev with Personal Token
-        env:
-          PUB_TOKEN: ${{ secrets.PUB_CREDENTIALS }}
+      - name: Publish Package to pub.dev
         run: |
           cd publish/totalis_types
-          echo "Publishing package to pub.dev using personal token v${{ steps.version.outputs.version }}..."
+          echo "Publishing package to pub.dev using credentials v${{ steps.version.outputs.version }}..."
           dart pub publish --force
           echo "✅ Package published successfully"
           
