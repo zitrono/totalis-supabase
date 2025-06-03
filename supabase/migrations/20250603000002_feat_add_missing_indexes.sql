@@ -11,9 +11,10 @@ CREATE INDEX IF NOT EXISTS idx_profile_categories_category_id ON profile_categor
 CREATE INDEX IF NOT EXISTS idx_messages_user_id ON messages(user_id);
 CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at DESC);
 
--- Check-ins (note: table is actually named check_in_sessions, but we'll also add for potential check_ins)
-CREATE INDEX IF NOT EXISTS idx_check_in_sessions_user_id ON check_in_sessions(user_id);
-CREATE INDEX IF NOT EXISTS idx_check_in_sessions_category_id ON check_in_sessions(category_id);
+-- Check-ins (these indexes will be created with the checkins table in a later migration)
+-- Commented out as the table doesn't exist yet at this point
+-- CREATE INDEX IF NOT EXISTS idx_checkins_user_id ON checkins(user_id);
+-- CREATE INDEX IF NOT EXISTS idx_checkins_category_id ON checkins(category_id);
 
 -- Analytics events (already has indexes from previous migration)
 CREATE INDEX IF NOT EXISTS idx_analytics_events_user_created ON analytics_events(user_id, created_at DESC);
