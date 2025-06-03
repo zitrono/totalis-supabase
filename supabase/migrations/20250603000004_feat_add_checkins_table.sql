@@ -40,16 +40,20 @@ ALTER TABLE checkins ENABLE ROW LEVEL SECURITY;
 ALTER TABLE checkin_answers ENABLE ROW LEVEL SECURITY;
 
 -- RLS policies for checkins
+DROP POLICY IF EXISTS "Users can view own checkins" ON checkins;
 CREATE POLICY "Users can view own checkins" ON checkins
   FOR SELECT USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can insert own checkins" ON checkins;
 CREATE POLICY "Users can insert own checkins" ON checkins
   FOR INSERT WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can update own checkins" ON checkins;
 CREATE POLICY "Users can update own checkins" ON checkins
   FOR UPDATE USING (auth.uid() = user_id);
 
 -- RLS policies for checkin_answers
+DROP POLICY IF EXISTS "Users can view own checkin answers" ON checkin_answers;
 CREATE POLICY "Users can view own checkin answers" ON checkin_answers
   FOR SELECT USING (
     EXISTS (
@@ -59,6 +63,7 @@ CREATE POLICY "Users can view own checkin answers" ON checkin_answers
     )
   );
 
+DROP POLICY IF EXISTS "Users can insert own checkin answers" ON checkin_answers;
 CREATE POLICY "Users can insert own checkin answers" ON checkin_answers
   FOR INSERT WITH CHECK (
     EXISTS (

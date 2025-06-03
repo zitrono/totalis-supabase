@@ -24,6 +24,7 @@ CREATE INDEX IF NOT EXISTS idx_user_stats_user_id ON user_stats(user_id);
 ALTER TABLE user_stats ENABLE ROW LEVEL SECURITY;
 
 -- RLS policies
+DROP POLICY IF EXISTS "Users can view own stats" ON user_stats;
 CREATE POLICY "Users can view own stats" ON user_stats
   FOR SELECT USING (auth.uid() = user_id);
 
@@ -62,10 +63,12 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Create triggers
+DROP TRIGGER IF EXISTS update_user_stats_on_checkin ON checkins;
 CREATE TRIGGER update_user_stats_on_checkin
   AFTER INSERT OR UPDATE ON checkins
   FOR EACH ROW EXECUTE FUNCTION update_user_stats();
 
+DROP TRIGGER IF EXISTS update_user_stats_on_message ON messages;
 CREATE TRIGGER update_user_stats_on_message
   AFTER INSERT ON messages
   FOR EACH ROW EXECUTE FUNCTION update_user_stats();
