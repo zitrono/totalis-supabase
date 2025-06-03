@@ -46,6 +46,36 @@ BEGIN
   EXCEPTION
     WHEN duplicate_column THEN NULL;
   END;
+  
+  BEGIN
+    ALTER TABLE health_cards ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
+  EXCEPTION
+    WHEN duplicate_column THEN NULL;
+  END;
+  
+  BEGIN
+    ALTER TABLE health_cards ADD COLUMN IF NOT EXISTS importance INTEGER DEFAULT 5;
+  EXCEPTION
+    WHEN duplicate_column THEN NULL;
+  END;
+  
+  BEGIN
+    ALTER TABLE health_cards ADD COLUMN IF NOT EXISTS relevance NUMERIC(3,2) DEFAULT 0.5;
+  EXCEPTION
+    WHEN duplicate_column THEN NULL;
+  END;
+  
+  BEGIN
+    ALTER TABLE health_cards ADD COLUMN IF NOT EXISTS viewed_at TIMESTAMPTZ;
+  EXCEPTION
+    WHEN duplicate_column THEN NULL;
+  END;
+  
+  BEGIN
+    ALTER TABLE health_cards ADD COLUMN IF NOT EXISTS dismissed_at TIMESTAMPTZ;
+  EXCEPTION
+    WHEN duplicate_column THEN NULL;
+  END;
 END $$;
 
 -- Add indexes
@@ -58,7 +88,13 @@ BEGIN
   END IF;
 END $$;
 CREATE INDEX IF NOT EXISTS idx_health_cards_category_id ON health_cards(category_id) WHERE category_id IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_health_cards_active ON health_cards(user_id, is_active) WHERE is_active = true;
+-- Only create is_active index if column exists
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'health_cards' AND column_name = 'is_active') THEN
+    CREATE INDEX IF NOT EXISTS idx_health_cards_active ON health_cards(user_id, is_active) WHERE is_active = true;
+  END IF;
+END $$;
 
 -- Enable RLS
 ALTER TABLE health_cards ENABLE ROW LEVEL SECURITY;
