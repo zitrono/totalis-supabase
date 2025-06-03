@@ -99,16 +99,20 @@ END $$;
 -- Enable RLS
 ALTER TABLE health_cards ENABLE ROW LEVEL SECURITY;
 
--- RLS policies
+-- RLS policies (drop and recreate to ensure correct configuration)
+DROP POLICY IF EXISTS "Users can view own health cards" ON health_cards;
 CREATE POLICY "Users can view own health cards" ON health_cards
   FOR SELECT USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can insert own health cards" ON health_cards;
 CREATE POLICY "Users can insert own health cards" ON health_cards
   FOR INSERT WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can update own health cards" ON health_cards;
 CREATE POLICY "Users can update own health cards" ON health_cards
   FOR UPDATE USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can delete own health cards" ON health_cards;
 CREATE POLICY "Users can delete own health cards" ON health_cards
   FOR DELETE USING (auth.uid() = user_id);
 
