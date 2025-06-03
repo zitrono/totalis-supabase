@@ -54,13 +54,11 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Create user dashboard view
+-- Note: In our schema, profiles.id is the user_id (references auth.users)
 CREATE OR REPLACE VIEW user_dashboard AS
 SELECT 
-  p.id,
-  p.user_id,
-  p.first_name,
-  p.last_name,
-  p.email,
+  p.id as user_id,
+  au.email,
   c.name as coach_name,
   c.id as coach_id,
   COUNT(DISTINCT ch.id) as total_checkins,
@@ -69,11 +67,12 @@ SELECT
   MAX(ch.created_at) as last_checkin,
   p.created_at as member_since
 FROM profiles p
+LEFT JOIN auth.users au ON au.id = p.id
 LEFT JOIN coaches c ON p.coach_id = c.id
-LEFT JOIN checkins ch ON ch.user_id = p.user_id
-LEFT JOIN recommendations r ON r.user_id = p.user_id
-LEFT JOIN profile_categories pc ON pc.user_id = p.user_id
-GROUP BY p.id, p.user_id, p.first_name, p.last_name, p.email, c.name, c.id, p.created_at;
+LEFT JOIN checkins ch ON ch.user_id = p.id
+LEFT JOIN recommendations r ON r.user_id = p.id
+LEFT JOIN profile_categories pc ON pc.user_id = p.id
+GROUP BY p.id, au.email, c.name, c.id, p.created_at;
 
 -- Grant access
 GRANT SELECT ON user_dashboard TO authenticated;
