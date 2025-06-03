@@ -18,4 +18,5 @@ CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at DESC);
 
 -- Analytics events (already has indexes from previous migration)
 CREATE INDEX IF NOT EXISTS idx_analytics_events_user_created ON analytics_events(user_id, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_analytics_events_type ON analytics_events(event_type);
+-- Skipping event_type index as it's causing deployment issues
+-- CREATE INDEX IF NOT EXISTS idx_analytics_events_type ON analytics_events(event_type);
