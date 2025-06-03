@@ -54,14 +54,40 @@ export async function setupTestUsers(): Promise<void> {
   
   if (!allUsersExist) {
     console.log(`
-⚠️  Some test users are missing. Please ensure:
-1. You've run the latest migrations
-2. seed.sql has been applied
-3. You're running against the correct environment
-
-In preview branches, test users may not be available due to auth.users restrictions.
-Tests will skip authentication steps in this case.
+⚠️  Some test users are missing. Attempting to create them...
     `)
+    
+    // Try to create test users using the RPC function
+    try {
+      const { data, error } = await serviceClient.rpc('create_test_users_rpc')
+      
+      if (error) {
+        console.error('Failed to create test users via RPC:', error)
+        console.log(`
+⚠️  Could not create test users. In preview branches, this is expected.
+Tests will be skipped or may fail.
+        `)
+      } else if (data?.success) {
+        console.log('✅ Test users created successfully via RPC')
+        
+        // Verify they were created
+        for (const testUser of TEST_USERS) {
+          const { error: signInError } = await serviceClient.auth.signInWithPassword({
+            email: testUser.email,
+            password: testUser.password
+          })
+          
+          if (!signInError) {
+            console.log(`✅ Verified test user ${testUser.email} can sign in`)
+            await serviceClient.auth.signOut()
+          }
+        }
+      } else {
+        console.log('❌ RPC returned:', data)
+      }
+    } catch (rpcError) {
+      console.error('RPC call failed:', rpcError)
+    }
   } else {
     console.log('✨ All test users verified')
   }
