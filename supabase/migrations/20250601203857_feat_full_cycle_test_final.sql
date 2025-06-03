@@ -5,4 +5,4 @@
 COMMENT ON TABLE recommendations IS 'AI-generated health recommendations and guidance - full cycle automation test';
 
 -- This change is benign and doesn't affect functionality
--- It will trigger: Types generation ’ Tag creation ’ Manual trigger ’ OIDC publishing ’ pub.dev
+-- It will trigger: Types generation -> Tag creation -> Manual trigger -> OIDC publishing -> pub.dev
