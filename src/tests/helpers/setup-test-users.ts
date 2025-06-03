@@ -54,39 +54,29 @@ export async function setupTestUsers(): Promise<void> {
   
   if (!allUsersExist) {
     console.log(`
-⚠️  Some test users are missing. Attempting to create them...
+⚠️  Some test users are missing in auth.users.
     `)
     
-    // Try to create test users using the RPC function
-    try {
-      const { data, error } = await serviceClient.rpc('create_test_users_rpc')
-      
-      if (error) {
-        console.error('Failed to create test users via RPC:', error)
-        console.log(`
-⚠️  Could not create test users. In preview branches, this is expected.
-Tests will be skipped or may fail.
-        `)
-      } else if (data?.success) {
-        console.log('✅ Test users created successfully via RPC')
-        
-        // Verify they were created
-        for (const testUser of TEST_USERS) {
-          const { error: signInError } = await serviceClient.auth.signInWithPassword({
-            email: testUser.email,
-            password: testUser.password
-          })
-          
-          if (!signInError) {
-            console.log(`✅ Verified test user ${testUser.email} can sign in`)
-            await serviceClient.auth.signOut()
-          }
-        }
-      } else {
-        console.log('❌ RPC returned:', data)
-      }
-    } catch (rpcError) {
-      console.error('RPC call failed:', rpcError)
+    // Check if we have mock profiles for testing
+    const { data: mockProfiles } = await serviceClient
+      .from('profiles')
+      .select('email')
+      .in('email', TEST_USERS.map(u => u.email))
+    
+    if (mockProfiles && mockProfiles.length > 0) {
+      console.log(`
+✅ Found ${mockProfiles.length} mock profiles for testing.
+📝 Tests will use mock data instead of real authentication.
+      `)
+      mockProfiles.forEach(p => {
+        console.log(`   - ${p.email}`)
+      })
+    } else {
+      console.log(`
+❌ No test users or mock profiles found.
+⚠️  In preview branches, this is expected due to auth schema restrictions.
+📝 Tests requiring user data will fail or be skipped.
+      `)
     }
   } else {
     console.log('✨ All test users verified')
