@@ -54,14 +54,30 @@ export async function setupTestUsers(): Promise<void> {
   
   if (!allUsersExist) {
     console.log(`
-⚠️  Some test users are missing. Please ensure:
-1. You've run the latest migrations
-2. seed.sql has been applied
-3. You're running against the correct environment
-
-In preview branches, test users may not be available due to auth.users restrictions.
-Tests will skip authentication steps in this case.
+⚠️  Some test users are missing in auth.users.
     `)
+    
+    // Check if we have mock profiles for testing
+    const { data: mockProfiles } = await serviceClient
+      .from('profiles')
+      .select('email')
+      .in('email', TEST_USERS.map(u => u.email))
+    
+    if (mockProfiles && mockProfiles.length > 0) {
+      console.log(`
+✅ Found ${mockProfiles.length} mock profiles for testing.
+📝 Tests will use mock data instead of real authentication.
+      `)
+      mockProfiles.forEach(p => {
+        console.log(`   - ${p.email}`)
+      })
+    } else {
+      console.log(`
+❌ No test users or mock profiles found.
+⚠️  In preview branches, this is expected due to auth schema restrictions.
+📝 Tests requiring user data will fail or be skipped.
+      `)
+    }
   } else {
     console.log('✨ All test users verified')
   }

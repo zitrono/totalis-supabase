@@ -3,6 +3,7 @@ import { createClient, SupabaseClient, User } from '@supabase/supabase-js'
 import { getTestConfig, logTestConfig } from '../config/test-env'
 import { createTestClients, getServiceClient } from '../helpers/test-client'
 import { setupTestUsers } from '../helpers/setup-test-users'
+import { testWithAuth, getMockUserId, skipIfPreview } from '../helpers/skip-auth'
 import * as fs from 'fs'
 import * as path from 'path'
 
@@ -319,6 +320,12 @@ describe('SDK Operations - Priority 1 Mobile Migration', () => {
 
   describe('User Profile CRUD Operations', () => {
     beforeEach(async () => {
+      if (skipIfPreview('User Profile CRUD setup')) {
+        // Use mock user ID in preview
+        testUser = { id: getMockUserId('test2@totalis.app') } as User
+        return
+      }
+      
       // Ensure authenticated
       const { data, error } = await supabase.auth.signInWithPassword({
         email: 'test2@totalis.app',
