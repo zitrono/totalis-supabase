@@ -1,4 +1,16 @@
 -- Create user_stats table for analytics (v4.2.19)
+-- First check if user_stats exists as a view and drop it
+DO $$
+BEGIN
+  -- Check if user_stats exists as a view
+  IF EXISTS (
+    SELECT 1 FROM information_schema.views 
+    WHERE table_name = 'user_stats'
+  ) THEN
+    DROP VIEW user_stats CASCADE;
+  END IF;
+END $$;
+
 CREATE TABLE IF NOT EXISTS user_stats (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE UNIQUE,
@@ -17,16 +29,42 @@ CREATE TABLE IF NOT EXISTS user_stats (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Create index on user_id
-CREATE INDEX IF NOT EXISTS idx_user_stats_user_id ON user_stats(user_id);
+-- Only create index if user_stats is a table (not a view)
+DO $$
+BEGIN
+  -- Check if user_stats is a table
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables 
+    WHERE table_name = 'user_stats' AND table_type = 'BASE TABLE'
+  ) THEN
+    CREATE INDEX IF NOT EXISTS idx_user_stats_user_id ON user_stats(user_id);
+  END IF;
+END $$;
 
--- Enable RLS
-ALTER TABLE user_stats ENABLE ROW LEVEL SECURITY;
+-- Enable RLS only if it's a table
+DO $$
+BEGIN
+  -- Check if user_stats is a table
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables 
+    WHERE table_name = 'user_stats' AND table_type = 'BASE TABLE'
+  ) THEN
+    ALTER TABLE user_stats ENABLE ROW LEVEL SECURITY;
+  END IF;
+END $$;
 
--- RLS policies
-DROP POLICY IF EXISTS "Users can view own stats" ON user_stats;
-CREATE POLICY "Users can view own stats" ON user_stats
-  FOR SELECT USING (auth.uid() = user_id);
+-- RLS policies (only if it's a table)
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables 
+    WHERE table_name = 'user_stats' AND table_type = 'BASE TABLE'
+  ) THEN
+    DROP POLICY IF EXISTS "Users can view own stats" ON user_stats;
+    CREATE POLICY "Users can view own stats" ON user_stats
+      FOR SELECT USING (auth.uid() = user_id);
+  END IF;
+END $$;
 
 -- Create function to update user stats
 CREATE OR REPLACE FUNCTION update_user_stats()
