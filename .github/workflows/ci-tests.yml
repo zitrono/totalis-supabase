@@ -134,6 +134,7 @@ jobs:
           script: |
             const fs = require('fs');
             let coverage = {};
+            let cleanupData = {};
             
             try {
               const summary = JSON.parse(fs.readFileSync('coverage/coverage-summary.json', 'utf8'));
@@ -143,12 +144,23 @@ jobs:
               coverage = { statements: { pct: 0 }, branches: { pct: 0 }, functions: { pct: 0 }, lines: { pct: 0 } };
             }
             
+            // Try to get cleanup results from step output
+            try {
+              const cleanupOutput = '${{ steps.cleanup.outputs.result }}';
+              if (cleanupOutput) {
+                cleanupData = JSON.parse(cleanupOutput);
+              }
+            } catch (e) {
+              console.log('No cleanup data available');
+            }
+            
             const status = '${{ steps.test.outcome }}' === 'success' ? '✅' : '❌';
             
-            const comment = `## ${status} Test Results
+            let comment = `## ${status} Test Results
             
             **Run ID**: \`gh_${{ github.run_id }}\`
             **Test Isolation**: Enabled ✅
+            **Environment**: Production/Staging (with test isolation)
             
             ### Coverage Report
             | Metric | Coverage |
@@ -158,7 +170,20 @@ jobs:
             | Functions | ${coverage.functions.pct.toFixed(1)}% |
             | Lines | ${coverage.lines.pct.toFixed(1)}% |
             
-            All test data has been automatically cleaned up.`;
+            ### Test Data Cleanup
+            `;
+            
+            if (cleanupData.total) {
+              comment += `✅ Successfully cleaned up **${cleanupData.total}** test records
+              - Profiles: ${cleanupData.profiles || 0}
+              - Messages: ${cleanupData.messages || 0}
+              - Recommendations: ${cleanupData.recommendations || 0}
+              - Checkins: ${cleanupData.checkins || 0}`;
+            } else {
+              comment += `Test data cleanup completed automatically.`;
+            }
+            
+            comment += `\n\n---\n*Tests run directly against production infrastructure with full isolation.*`;
             
             github.rest.issues.createComment({
               issue_number: context.issue.number,

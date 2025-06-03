@@ -152,8 +152,10 @@ describe('SDK Operations - With Test Isolation', () => {
         user_id: testUsers[0].userId,
         category_id: categoryId,
         title: `Test recommendation ${isolation.getRunId()}`,
-        content: 'This is a test recommendation',
-        status: 'active',
+        recommendation_text: 'This is a test recommendation',
+        recommendation_type: 'action',
+        importance: 3,
+        is_active: true,
         metadata: { test_run_id: isolation.getRunId() }
       }
       
@@ -201,14 +203,14 @@ describe('SDK Operations - With Test Isolation', () => {
       const { data: testProfiles } = await supabase
         .from('profiles')
         .select('id')
-        .eq('metadata->test_run_id', isolation.getRunId())
+        .filter('metadata->>test_run_id', 'eq', isolation.getRunId())
       
       expect(testProfiles?.length).toBe(3) // We created 3 test users
       
       const { data: testMessages } = await supabase
         .from('messages')
         .select('id')
-        .eq('metadata->test_run_id', isolation.getRunId())
+        .filter('metadata->>test_run_id', 'eq', isolation.getRunId())
       
       expect(testMessages?.length).toBeGreaterThan(0)
     })

@@ -72,10 +72,10 @@ export class TestIsolation {
    * Create an isolated test user
    */
   async createTestUser(index: number): Promise<TestUser> {
-    // Use a simple format that we know works
+    // Use unique email with timestamp and random to avoid conflicts
     const timestamp = Date.now()
     const random = Math.random().toString(36).substring(2, 5)
-    const email = `test${index}@example.com`  // Using example.com as it's more standard
+    const email = `test${timestamp}${random}${index}@example.com`
     const password = 'Test123!@#'
     
     console.log(`Creating test user: ${email}`)
@@ -97,17 +97,17 @@ export class TestIsolation {
       if (!adminError && adminData.user) {
         const userId = adminData.user.id
         
-        // Ensure profile exists with test metadata
+        // Update profile with test metadata (profile created by trigger)
         const { error: profileError } = await this.supabase
           .from('profiles')
-          .upsert({
-            id: userId,
+          .update({
             metadata: {
               test_run_id: this.runId,
               is_test: true,
               created_at: new Date().toISOString()
             }
           })
+          .eq('id', userId)
         
         const user: TestUser = { email, password, userId }
         this.createdUsers.push(user)
@@ -157,17 +157,17 @@ export class TestIsolation {
     
     const userId = authData.user!.id
     
-    // Ensure profile exists with test metadata
+    // Update profile with test metadata (profile created by trigger)
     const { error: profileError } = await this.supabase
       .from('profiles')
-      .upsert({
-        id: userId,
+      .update({
         metadata: {
           test_run_id: this.runId,
           is_test: true,
           created_at: new Date().toISOString()
         }
       })
+      .eq('id', userId)
       
     if (profileError) {
       console.error('Failed to create profile:', profileError)

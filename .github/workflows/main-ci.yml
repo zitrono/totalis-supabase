@@ -1,0 +1,40 @@
+name: Main CI/CD Pipeline
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+  id-token: write  # For OIDC authentication
+
+jobs:
+  # Quick validation checks
+  validate:
+    uses: ./.github/workflows/validate.yml
+    secrets: inherit
+
+  # Run tests with isolation on PR
+  test-isolation:
+    if: github.event_name == 'pull_request'
+    uses: ./.github/workflows/ci-tests.yml
+    secrets: inherit
+    needs: validate
+
+  # Deploy to production on main branch
+  deploy-production:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    uses: ./.github/workflows/production.yml
+    secrets: inherit
+    needs: validate
+
+  # Generate and publish types after production deployment
+  publish-types:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    uses: ./.github/workflows/generate-publish-types.yml
+    secrets: inherit
+    needs: deploy-production

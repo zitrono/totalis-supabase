@@ -253,16 +253,62 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run all integration tests
+      - name: Run all integration tests with isolation
+        id: test
         run: |
-          echo "🧪 Running integration tests..."
+          echo "🧪 Running integration tests with test isolation..."
+          echo "   Run ID: gh_${{ github.run_id }}"
           npm run test:integration
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           ENVIRONMENT: test
           NODE_ENV: test
+          GITHUB_RUN_ID: ${{ github.run_id }}
+      
+      - name: Cleanup test data
+        if: always()
+        run: |
+          echo "🧹 Cleaning up test data for run: gh_${{ github.run_id }}"
+          node -e "
+          const { createClient } = require('@supabase/supabase-js');
+          const supabase = createClient(
+            process.env.SUPABASE_URL,
+            process.env.SUPABASE_SERVICE_ROLE_KEY,
+            { auth: { persistSession: false } }
+          );
+          
+          (async () => {
+            try {
+              const { data, error } = await supabase.rpc('cleanup_test_data', { 
+                run_id: 'gh_' + process.env.GITHUB_RUN_ID 
+              });
+              
+              if (error) {
+                console.error('❌ Cleanup error:', error);
+              } else {
+                console.log('✅ Test data cleaned up:', data);
+              }
+              
+              // Also try to clean up auth users
+              const { data: { users } } = await supabase.auth.admin.listUsers();
+              const testUsers = users.filter(u => u.email.includes('gh_' + process.env.GITHUB_RUN_ID));
+              
+              for (const user of testUsers) {
+                await supabase.auth.admin.deleteUser(user.id);
+                console.log('Deleted test user:', user.email);
+              }
+            } catch (err) {
+              console.error('Cleanup failed:', err);
+            }
+          })();
+          "
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
       
       - name: Report Final Status
         if: always()
