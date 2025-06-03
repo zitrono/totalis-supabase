@@ -1,0 +1,147 @@
+name: Cleanup Old Test Data
+
+on:
+  schedule:
+    - cron: '0 2 * * *' # Daily at 2 AM UTC
+  workflow_dispatch:
+    inputs:
+      days_old:
+        description: 'Delete test data older than X days'
+        required: false
+        default: '7'
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Install dependencies
+        run: npm install @supabase/supabase-js
+      
+      - name: Cleanup old test data
+        run: |
+          echo "🧹 Starting scheduled cleanup of old test data..."
+          
+          cat > cleanup-old-data.js << 'EOF'
+          const { createClient } = require('@supabase/supabase-js');
+          
+          async function cleanupOldTestData() {
+            const supabase = createClient(
+              process.env.SUPABASE_URL,
+              process.env.SUPABASE_SERVICE_ROLE_KEY,
+              { auth: { persistSession: false } }
+            );
+            
+            const daysOld = parseInt('${{ github.event.inputs.days_old }}' || '7');
+            console.log(`Cleaning up test data older than ${daysOld} days`);
+            
+            try {
+              // Call cleanup function for old test data
+              const { data: cleanupResult, error: cleanupError } = await supabase
+                .rpc('cleanup_old_test_data');
+              
+              if (cleanupError) {
+                console.error('❌ Database cleanup error:', cleanupError);
+              } else {
+                console.log('✅ Database cleanup result:', cleanupResult);
+              }
+              
+              // Clean up auth.users test accounts
+              console.log('\n🔍 Looking for old test users in auth.users...');
+              
+              const { data: { users }, error: listError } = await supabase.auth.admin.listUsers();
+              
+              if (listError) {
+                console.error('❌ Error listing users:', listError);
+                return;
+              }
+              
+              const cutoffDate = new Date(Date.now() - daysOld * 24 * 60 * 60 * 1000);
+              const testUsers = users.filter(u => {
+                // Match our test user pattern
+                const isTestUser = u.email.match(/^test_.*_user\d+@totalis\.app$/);
+                const isOld = new Date(u.created_at) < cutoffDate;
+                return isTestUser && isOld;
+              });
+              
+              console.log(`Found ${testUsers.length} old test users to delete`);
+              
+              let deleted = 0;
+              let failed = 0;
+              
+              for (const user of testUsers) {
+                try {
+                  const { error: deleteError } = await supabase.auth.admin.deleteUser(user.id);
+                  
+                  if (deleteError) {
+                    console.error(`❌ Failed to delete ${user.email}:`, deleteError.message);
+                    failed++;
+                  } else {
+                    console.log(`✅ Deleted: ${user.email} (created: ${user.created_at})`);
+                    deleted++;
+                  }
+                } catch (err) {
+                  console.error(`❌ Error deleting ${user.email}:`, err);
+                  failed++;
+                }
+              }
+              
+              console.log(`\n📊 Summary:`);
+              console.log(`   Total test users found: ${testUsers.length}`);
+              console.log(`   Successfully deleted: ${deleted}`);
+              console.log(`   Failed to delete: ${failed}`);
+              
+              // Log to system_logs
+              const { error: logError } = await supabase
+                .from('system_logs')
+                .insert({
+                  log_level: 'info',
+                  component: 'scheduled_cleanup',
+                  message: 'Scheduled test data cleanup completed',
+                  metadata: {
+                    database_cleanup: cleanupResult,
+                    auth_cleanup: {
+                      found: testUsers.length,
+                      deleted,
+                      failed,
+                      days_old: daysOld
+                    },
+                    timestamp: new Date().toISOString()
+                  }
+                });
+                
+              if (logError) {
+                console.error('Failed to log cleanup results:', logError);
+              }
+              
+            } catch (err) {
+              console.error('❌ Cleanup failed:', err);
+              process.exit(1);
+            }
+          }
+          
+          cleanupOldTestData();
+          EOF
+          
+          node cleanup-old-data.js
+      
+      - name: Generate cleanup report
+        if: always()
+        run: |
+          echo "## 🧹 Test Data Cleanup Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Schedule**: Daily at 2 AM UTC" >> $GITHUB_STEP_SUMMARY
+          echo "**Days threshold**: ${{ github.event.inputs.days_old || '7' }} days" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Check the logs above for detailed cleanup results." >> $GITHUB_STEP_SUMMARY

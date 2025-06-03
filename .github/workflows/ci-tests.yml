@@ -1,0 +1,172 @@
+name: CI Tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      # Use production/staging credentials
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      GITHUB_RUN_ID: ${{ github.run_id }}
+      NODE_ENV: test
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Display test configuration
+        run: |
+          echo "🧪 Test Configuration:"
+          echo "   Run ID: gh_${{ github.run_id }}"
+          echo "   Environment: ${{ env.NODE_ENV }}"
+          echo "   Supabase URL: ${{ env.SUPABASE_URL }}"
+          echo ""
+          echo "📋 Test Isolation Strategy:"
+          echo "   - Each test creates isolated users with unique emails"
+          echo "   - All test data is tagged with run_id"
+          echo "   - Automatic cleanup after tests complete"
+      
+      - name: Run tests with isolation
+        id: test
+        run: |
+          echo "🚀 Starting isolated test run..."
+          npm test -- --coverage --coverageReporters=json-summary --coverageReporters=text
+        continue-on-error: true
+      
+      - name: Generate test report
+        if: always()
+        run: |
+          echo "## 📊 Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ -f coverage/coverage-summary.json ]; then
+            echo "### Coverage Report" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            cat coverage/coverage-summary.json | jq -r '.total | "Statements: \(.statements.pct)%\nBranches: \(.branches.pct)%\nFunctions: \(.functions.pct)%\nLines: \(.lines.pct)%"' >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Run ID**: \`gh_${{ github.run_id }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Status**: ${{ steps.test.outcome }}" >> $GITHUB_STEP_SUMMARY
+      
+      - name: Cleanup test data
+        if: always()
+        run: |
+          echo "🧹 Cleaning up test data..."
+          
+          # Create cleanup script
+          cat > cleanup.js << 'EOF'
+          const { createClient } = require('@supabase/supabase-js');
+          
+          async function cleanup() {
+            const supabase = createClient(
+              process.env.SUPABASE_URL,
+              process.env.SUPABASE_SERVICE_ROLE_KEY,
+              { auth: { persistSession: false } }
+            );
+            
+            const runId = `gh_${process.env.GITHUB_RUN_ID}`;
+            
+            try {
+              // Call cleanup function
+              const { data, error } = await supabase.rpc('cleanup_test_data', { 
+                run_id: runId 
+              });
+              
+              if (error) {
+                console.error('❌ Cleanup error:', error);
+                process.exit(1);
+              }
+              
+              console.log('✅ Test data cleaned up:', data);
+              
+              // Also try to clean up auth users
+              const { data: { users } } = await supabase.auth.admin.listUsers();
+              const testUsers = users.filter(u => u.email.includes(runId));
+              
+              console.log(`Found ${testUsers.length} test users to clean up`);
+              
+              for (const user of testUsers) {
+                const { error: deleteError } = await supabase.auth.admin.deleteUser(user.id);
+                if (deleteError) {
+                  console.error(`Failed to delete ${user.email}:`, deleteError);
+                } else {
+                  console.log(`Deleted: ${user.email}`);
+                }
+              }
+              
+            } catch (err) {
+              console.error('Cleanup failed:', err);
+              process.exit(1);
+            }
+          }
+          
+          cleanup();
+          EOF
+          
+          node cleanup.js
+      
+      - name: Comment PR results
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let coverage = {};
+            
+            try {
+              const summary = JSON.parse(fs.readFileSync('coverage/coverage-summary.json', 'utf8'));
+              coverage = summary.total;
+            } catch (e) {
+              console.log('No coverage data available');
+              coverage = { statements: { pct: 0 }, branches: { pct: 0 }, functions: { pct: 0 }, lines: { pct: 0 } };
+            }
+            
+            const status = '${{ steps.test.outcome }}' === 'success' ? '✅' : '❌';
+            
+            const comment = `## ${status} Test Results
+            
+            **Run ID**: \`gh_${{ github.run_id }}\`
+            **Test Isolation**: Enabled ✅
+            
+            ### Coverage Report
+            | Metric | Coverage |
+            |--------|----------|
+            | Statements | ${coverage.statements.pct.toFixed(1)}% |
+            | Branches | ${coverage.branches.pct.toFixed(1)}% |
+            | Functions | ${coverage.functions.pct.toFixed(1)}% |
+            | Lines | ${coverage.lines.pct.toFixed(1)}% |
+            
+            All test data has been automatically cleaned up.`;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+      
+      - name: Fail if tests failed
+        if: steps.test.outcome == 'failure'
+        run: exit 1

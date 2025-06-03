@@ -1,13 +1,13 @@
 import { describe, test, expect, beforeAll, afterAll, beforeEach } from '@jest/globals'
-import { createClient, SupabaseClient, User } from '@supabase/supabase-js'
+import { SupabaseClient, User } from '@supabase/supabase-js'
 import { getTestConfig, logTestConfig } from '../config/test-env'
-import { createTestClients, getServiceClient } from '../helpers/test-client'
-import { setupTestUsers } from '../helpers/setup-test-users'
-import { testWithAuth, getMockUserId, skipIfPreview } from '../helpers/skip-auth'
+import { TestIsolation, TestUser } from '../helpers/test-isolation'
 import * as fs from 'fs'
 import * as path from 'path'
 
 describe('SDK Operations - Priority 1 Mobile Migration', () => {
+  let isolation: TestIsolation
+  let testUsers: TestUser[]
   let supabase: SupabaseClient
   let testUser: User | null = null
   let testImagePath: string
@@ -16,20 +16,20 @@ describe('SDK Operations - Priority 1 Mobile Migration', () => {
     const config = getTestConfig()
     logTestConfig(config)
     
-    if (config.isPreview) {
-      console.log('🔧 Setting up test users for preview environment...')
-      await setupTestUsers()
-    }
+    console.log('🚀 Setting up isolated test environment...')
     
-    supabase = createClient(config.supabaseUrl, config.supabaseServiceKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false
-      }
-    })
+    // Create test isolation instance
+    isolation = new TestIsolation()
+    
+    // Create 3 isolated test users
+    testUsers = await isolation.createTestUsers(3)
+    console.log(`✅ Created ${testUsers.length} isolated test users`)
+    
+    // Get authenticated client for first user
+    supabase = await isolation.getAuthenticatedClient(testUsers[0])
     
     // Create test image file
-    testImagePath = path.join(__dirname, 'test-image.png')
+    testImagePath = path.join(__dirname, `test-image-${isolation.getRunId()}.png`)
     // Create a simple 1x1 pixel PNG
     const pngBuffer = Buffer.from([
       0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, // PNG signature
@@ -46,35 +46,37 @@ describe('SDK Operations - Priority 1 Mobile Migration', () => {
   })
 
   afterAll(async () => {
+    console.log('🧹 Cleaning up test environment...')
+    
     // Clean up test image
     if (fs.existsSync(testImagePath)) {
       fs.unlinkSync(testImagePath)
+    }
+    
+    // Clean up all test data
+    const result = await isolation.cleanup()
+    if (result) {
+      console.log(`✅ Cleanup complete: ${result.total} records deleted`)
     }
   })
 
   describe('Authentication Flows', () => {
     describe('Test User Authentication', () => {
       test('should sign in with test user', async () => {
-        // Use a proper test user instead of anonymous
+        // Use isolated test user
         const { data, error } = await supabase.auth.signInWithPassword({
-          email: 'test1@totalis.app',
-          password: 'Test123!@#'
+          email: testUsers[0].email,
+          password: testUsers[0].password
         })
-        
-        if (error) {
-          console.error('Auth error:', error)
-          // If test user doesn't exist, skip this test
-          expect(error.message).toContain('Invalid login credentials')
-          return
-        }
         
         expect(error).toBeNull()
         expect(data.user).toBeDefined()
         expect(data.user?.role).toBe('authenticated')
         expect(data.session).toBeDefined()
         expect(data.session?.access_token).toBeDefined()
+        expect(data.user?.id).toBe(testUsers[0].userId)
         
-        // Store for cleanup
+        // Store for compatibility
         testUser = data.user
       })
       
@@ -130,9 +132,10 @@ describe('SDK Operations - Priority 1 Mobile Migration', () => {
     
     describe('Pre-created Test User Authentication', () => {
       test('should sign in with email/password', async () => {
+        // Use second isolated test user
         const testCredentials = {
-          email: 'test1@totalis.app',
-          password: 'Test123!@#'
+          email: testUsers[1].email,
+          password: testUsers[1].password
         }
         
         const { data, error } = await supabase.auth.signInWithPassword(testCredentials)
@@ -166,22 +169,25 @@ describe('SDK Operations - Priority 1 Mobile Migration', () => {
   describe('Storage Operations', () => {
     // Skip storage tests if bucket doesn't exist
     const bucketName = 'user-images'
-    let testFileName = `test-${Date.now()}/test-image.png`
+    let testFileName: string
     
     beforeEach(async () => {
       // Ensure authenticated for storage operations
       const { error } = await supabase.auth.signInWithPassword({
-        email: 'test1@totalis.app',
-        password: 'Test123!@#'
+        email: testUsers[0].email,
+        password: testUsers[0].password
       })
       expect(error).toBeNull()
+      
+      // Initialize testFileName for each test
+      testFileName = `test-${isolation.getRunId()}-${Date.now()}.png`
     })
     
     test('should upload image to storage', async () => {
       const fileBuffer = fs.readFileSync(testImagePath)
       
       // First, let's try with a simpler path
-      const simpleFileName = `test-image-${Date.now()}.png`
+      const simpleFileName = `test-image-${isolation.getRunId()}-${Date.now()}.png`
       
       const { data, error } = await supabase.storage
         .from(bucketName)
@@ -236,7 +242,7 @@ describe('SDK Operations - Priority 1 Mobile Migration', () => {
       // This test doesn't depend on upload success
       const { data, error } = await supabase.storage
         .from(bucketName)
-        .list(`test-${Date.now()}`, {
+        .list(`test-${isolation.getRunId()}`, {
           limit: 10,
           offset: 0
         })
@@ -320,19 +326,13 @@ describe('SDK Operations - Priority 1 Mobile Migration', () => {
 
   describe('User Profile CRUD Operations', () => {
     beforeEach(async () => {
-      if (skipIfPreview('User Profile CRUD setup')) {
-        // Use mock user ID in preview
-        testUser = { id: getMockUserId('test2@totalis.app') } as User
-        return
-      }
+      // Switch to test user 2 for profile operations
+      supabase = await isolation.getAuthenticatedClient(testUsers[1])
       
-      // Ensure authenticated
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: 'test2@totalis.app',
-        password: 'Test123!@#'
-      })
+      // Get current user
+      const { data: { user }, error } = await supabase.auth.getUser()
       expect(error).toBeNull()
-      testUser = data.user
+      testUser = user
     })
     
     test('should create user profile', async () => {
@@ -352,7 +352,8 @@ describe('SDK Operations - Priority 1 Mobile Migration', () => {
         metadata: {
           test_timestamp: Date.now(),
           test: true,
-          created_at: new Date().toISOString()
+          created_at: new Date().toISOString(),
+          test_run_id: isolation.getRunId()
         }
       }
       
@@ -438,7 +439,10 @@ describe('SDK Operations - Priority 1 Mobile Migration', () => {
           .from('profiles')
           .insert({ 
             id: testUser!.id,
-            metadata: { test_timestamp: Date.now() }
+            metadata: { 
+              test_timestamp: Date.now(),
+              test_run_id: isolation.getRunId()
+            }
           })
       }
       

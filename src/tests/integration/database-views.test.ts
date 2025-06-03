@@ -1,10 +1,11 @@
 import { createClient } from '@supabase/supabase-js'
 import { getTestConfig } from '../config/test-env'
 import { randomUUID } from 'crypto'
-import { createTestClients, getServiceClient } from '../helpers/test-client'
-import { setupTestUsers } from '../helpers/setup-test-users'
+import { TestIsolation, TestUser } from '../helpers/test-isolation'
 
 describe('Database Views', () => {
+  let isolation: TestIsolation
+  let testUsers: TestUser[]
   let testUserId: string
   let testCoachId: string
   let testCategoryId: string
@@ -12,17 +13,23 @@ describe('Database Views', () => {
   let userClient: any
 
   beforeAll(async () => {
-    const config = getTestConfig()
-    if (config.isPreview) {
-      console.log('🔧 Setting up test users for preview environment...')
-      await setupTestUsers()
-    }
+    console.log('🚀 Setting up isolated test environment...')
     
-    // Get test clients
-    const clients = await createTestClients('test2@totalis.app', 'Test123!@#')
-    serviceClient = clients.serviceClient
-    userClient = clients.userClient
-    testUserId = clients.userId!
+    // Create test isolation instance
+    isolation = new TestIsolation()
+    
+    // Create isolated test user
+    testUsers = await isolation.createTestUsers(1)
+    console.log(`✅ Created ${testUsers.length} isolated test user`)
+    
+    testUserId = testUsers[0].userId
+    
+    // Get service client and authenticated user client
+    const config = getTestConfig()
+    serviceClient = createClient(config.supabaseUrl, config.supabaseServiceKey, {
+      auth: { persistSession: false }
+    })
+    userClient = await isolation.getAuthenticatedClient(testUsers[0])
     
     // Create test data using service client
     const { data: coach } = await serviceClient
@@ -33,7 +40,10 @@ describe('Database Views', () => {
         photo_url: 'https://example.com/coach.jpg',
         sex: 'female',
         year_of_birth: 1980,
-        metadata: { test: true, test_run: Date.now() }
+        metadata: { 
+          test: true, 
+          test_run_id: isolation.getRunId() 
+        }
       })
       .select()
       .single()
@@ -48,30 +58,36 @@ describe('Database Views', () => {
     
     testCategoryId = category.id
     
-    // Upsert profile with coach (handles existing profiles)
+    // Update profile with coach (profile already created by TestIsolation)
     const { error: profileError } = await serviceClient
       .from('profiles')
-      .upsert({
-        id: testUserId,
-        name: 'Test User',
-        coach_id: testCoachId,
-        metadata: { test: true, test_run: Date.now() }
+      .update({
+        coach_id: testCoachId
       })
+      .eq('id', testUserId)
       .select()
       .single()
     
     if (profileError) {
-      console.error('Error upserting profile:', profileError)
+      console.error('Error updating profile:', profileError)
       throw profileError
     }
   })
 
   afterAll(async () => {
-    // Cleanup test data
+    console.log('🧹 Cleaning up test environment...')
+    
+    // Clean up coach before user cleanup
     await serviceClient
       .from('coaches')
       .delete()
       .eq('id', testCoachId)
+    
+    // Clean up all test data
+    const result = await isolation.cleanup()
+    if (result) {
+      console.log(`✅ Cleanup complete: ${result.total} records deleted`)
+    }
   })
 
   describe('user_profiles_with_coaches view', () => {
@@ -102,7 +118,7 @@ describe('Database Views', () => {
           user_id: testUserId,
           category_id: testCategoryId,
           is_favorite: true,
-          metadata: { test: true, test_run: Date.now() }
+          metadata: { test: true, test_run_id: isolation.getRunId() }
         })
     })
 
@@ -150,7 +166,7 @@ describe('Database Views', () => {
           recommendation_type: 'action',
           importance: 3,
           is_active: true,
-          metadata: { test: true, test_run: Date.now() }
+          metadata: { test: true, test_run_id: isolation.getRunId() }
         })
         .select()
         .single()
@@ -229,7 +245,7 @@ describe('Database Views', () => {
           summary: 'Test checkin summary',
           started_at: new Date().toISOString(),
           completed_at: new Date().toISOString(),
-          metadata: { test: true, test_run: Date.now() }
+          metadata: { test: true, test_run_id: isolation.getRunId() }
         })
         .select()
         .single()
@@ -263,7 +279,7 @@ describe('Database Views', () => {
           category_id: testCategoryId,
           status: 'in_progress',
           started_at: new Date().toISOString(),
-          metadata: { test: true, test_run: Date.now() }
+          metadata: { test: true, test_run_id: isolation.getRunId() }
         })
         .select()
         .single()
@@ -292,7 +308,7 @@ describe('Database Views', () => {
           content: 'Hello from your coach!',
           coach_id: testCoachId,
           conversation_id: randomUUID(),
-          metadata: { test: true, test_run: Date.now() }
+          metadata: { test: true, test_run_id: isolation.getRunId() }
         })
         .select()
         .single()
@@ -329,7 +345,7 @@ describe('Database Views', () => {
           content: 'Hello coach!',
           coach_id: testCoachId,
           conversation_id: randomUUID(),
-          metadata: { test: true, test_run: Date.now() }
+          metadata: { test: true, test_run_id: isolation.getRunId() }
         })
         .select()
         .single()

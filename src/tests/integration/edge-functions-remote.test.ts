@@ -1,9 +1,11 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from '@jest/globals'
+import { describe, it, expect, beforeAll, afterAll } from '@jest/globals'
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import { getTestConfig, logTestConfig, TestConfig } from '../config/test-env'
-import { setupTestUsers } from '../helpers/setup-test-users'
+import { TestIsolation, TestUser } from '../helpers/test-isolation'
 
 describe('Edge Functions Remote Integration Tests', () => {
+  let isolation: TestIsolation
+  let testUsers: TestUser[]
   let supabase: SupabaseClient
   let adminSupabase: SupabaseClient
   let config: TestConfig
@@ -14,6 +16,15 @@ describe('Edge Functions Remote Integration Tests', () => {
     // Get test configuration
     config = getTestConfig()
     logTestConfig(config)
+    
+    console.log('🚀 Setting up isolated test environment...')
+    
+    // Create test isolation instance
+    isolation = new TestIsolation()
+    
+    // Create isolated test user
+    testUsers = await isolation.createTestUsers(1)
+    console.log(`✅ Created ${testUsers.length} isolated test user`)
 
     // Create admin client for test data management
     adminSupabase = createClient(
@@ -27,42 +38,24 @@ describe('Edge Functions Remote Integration Tests', () => {
       }
     )
 
-    // Create regular client
-    supabase = createClient(
-      config.supabaseUrl,
-      config.supabaseAnonKey
-    )
-
-    // Setup test users if in preview mode
-    if (config.isPreview) {
-      console.log('🔧 Setting up test users for preview environment...')
-      await setupTestUsers()
-    }
-
-    // Use pre-created test user to avoid rate limits
-    console.log('🔐 Signing in with pre-created test user...')
-    const { data: authData, error } = await supabase.auth.signInWithPassword({
-      email: 'test3@totalis.app',
-      password: 'Test123!@#'
-    })
+    // Get authenticated client for test user
+    supabase = await isolation.getAuthenticatedClient(testUsers[0])
     
-    if (error) {
-      throw new Error(`Failed to sign in with test user: ${error.message}`)
-    }
-    
-    testUser = authData.user
-    authToken = authData.session?.access_token || ''
-    console.log('✅ Signed in successfully')
-  })
-
-  beforeEach(async () => {
-    // Use the existing test user instead of creating a new one
-    // This avoids rate limiting issues
+    // Get auth details for direct API calls
+    const { data: session } = await supabase.auth.getSession()
+    authToken = session.session?.access_token || ''
+    testUser = session.session?.user
+    console.log('✅ Test user authenticated successfully')
   })
 
   afterAll(async () => {
-    // Sign out
-    await supabase.auth.signOut()
+    console.log('🧹 Cleaning up test environment...')
+    
+    // Clean up all test data
+    const result = await isolation.cleanup()
+    if (result) {
+      console.log(`✅ Cleanup complete: ${result.total} records deleted`)
+    }
   })
 
   describe('Langflow Webhook', () => {
