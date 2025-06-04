@@ -6,23 +6,17 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
 import { corsHeaders } from "../_shared/cors.ts";
 
 interface TranscriptionRequest {
-  // Support both camelCase (new standard) and snake_case (legacy)
-  audioUrl?: string;
   audio_url?: string;
-  audioBase64?: string;
   audio_base64?: string;
   language?: string;
   prompt?: string;
-  messageId?: string;
   message_id?: string; // For updating message after transcription
   batch?: TranscriptionBatchItem[]; // For batch processing
 }
 
 interface TranscriptionBatchItem {
   id: string;
-  audioUrl?: string;
   audio_url?: string;
-  audioBase64?: string;
   audio_base64?: string;
   language?: string;
   prompt?: string;
@@ -244,23 +238,14 @@ serve(async (req) => {
     }
 
     const body: TranscriptionRequest = await req.json();
-    // Support both camelCase (new standard) and snake_case (legacy)
     const {
-      audioUrl,
       audio_url,
-      audioBase64,
       audio_base64,
       language = "en",
       prompt,
-      messageId,
       message_id,
       batch,
     } = body;
-    
-    // Use camelCase values if provided, otherwise fall back to snake_case
-    const finalAudioUrl = audioUrl || audio_url;
-    const finalAudioBase64 = audioBase64 || audio_base64;
-    const finalMessageId = messageId || message_id;
 
     // Handle batch processing
     if (batch && batch.length > 0) {
@@ -274,8 +259,8 @@ serve(async (req) => {
           chunk.map(async (item) => {
             try {
               const result = await transcribeAudio({
-                audio_url: item.audioUrl || item.audio_url,
-                audio_base64: item.audioBase64 || item.audio_base64,
+                audio_url: item.audio_url,
+                audio_base64: item.audio_base64,
                 language: item.language || language,
                 prompt: item.prompt || prompt,
                 supabaseServiceKey,
@@ -314,8 +299,8 @@ serve(async (req) => {
 
     // Single transcription
     const result = await transcribeAudio({
-      audio_url: finalAudioUrl,
-      audio_base64: finalAudioBase64,
+      audio_url,
+      audio_base64,
       language,
       prompt,
       supabaseServiceKey,
@@ -323,10 +308,10 @@ serve(async (req) => {
     });
 
     // Update message if message_id provided
-    if (finalMessageId) {
+    if (message_id) {
       await supabase.rpc("complete_voice_upload", {
-        p_message_id: finalMessageId,
-        p_voice_url: finalAudioUrl,
+        p_message_id: message_id,
+        p_voice_url: audio_url,
         p_voice_duration: Math.round(result.duration || 0),
         p_transcription: result.text,
       });
@@ -340,7 +325,7 @@ serve(async (req) => {
           duration_seconds: result.duration,
           detected_language: result.language,
           user_id: user.id,
-          has_message_id: !!finalMessageId,
+          has_message_id: !!message_id,
           is_batch: false,
         },
       },
@@ -350,7 +335,7 @@ serve(async (req) => {
       text: result.text,
       duration: result.duration,
       language: result.language,
-      message_id: finalMessageId,
+      message_id: message_id,
     };
 
     return new Response(

@@ -5,14 +5,12 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 import { corsHeaders } from "../_shared/cors.ts";
 import { createMonitoringContext } from "../_shared/monitoring.ts";
+import { CheckIn, CheckInResponse } from "../_shared/types.ts";
 
 interface CheckinRequest {
   action: "start" | "answer" | "complete" | "abandon";
-  categoryId?: string; // Support both camelCase
-  category_id?: string; // and snake_case
-  checkinId?: string;
+  category_id?: string;
   checkin_id?: string;
-  questionId?: string;
   question_id?: string;
   answer?: any;
   proposals?: any;
@@ -140,18 +138,17 @@ async function startCheckin(
   body: CheckinRequest,
   monitoring: any,
 ) {
-  // Support both camelCase and snake_case
-  const categoryId = body.categoryId || body.category_id;
+  const { category_id } = body;
 
-  if (!categoryId) {
-    throw new Error("categoryId or category_id is required");
+  if (!category_id) {
+    throw new Error("category_id is required");
   }
 
   // Verify category exists
   const { data: category, error: categoryError } = await supabase
     .from("categories")
     .select("*")
-    .eq("id", categoryId)
+    .eq("id", category_id)
     .single();
 
   if (categoryError || !category) {
@@ -163,7 +160,7 @@ async function startCheckin(
     .from("checkins")
     .select("*")
     .eq("user_id", userId)
-    .eq("category_id", categoryId)
+    .eq("category_id", category_id)
     .eq("status", "in_progress")
     .single();
 
@@ -177,16 +174,15 @@ async function startCheckin(
     const questions = existingCheckin.metadata?.template_questions ||
       generateInitialQuestions(category, []);
     const answeredIds = answers?.map((a: any) => a.question_id) || [];
-    const currentQuestionIndex = questions.findIndex((q: CheckinQuestion) =>
+    const current_question_index = questions.findIndex((q: CheckinQuestion) =>
       !answeredIds.includes(q.id)
     );
 
     return {
-      checkIn: existingCheckin,
-      checkin: existingCheckin, // For compatibility
+      checkin: existingCheckin,
       questions,
-      currentQuestion: questions[currentQuestionIndex] || questions[0],
-      currentQuestionIndex,
+      current_question: questions[current_question_index] || questions[0],
+      current_question_index: current_question_index,
       resumed: true,
       answers: answers || [],
     };
@@ -204,7 +200,7 @@ async function startCheckin(
     .from("checkins")
     .select("*")
     .eq("user_id", userId)
-    .eq("category_id", categoryId)
+    .eq("category_id", category_id)
     .eq("status", "completed")
     .order("completed_at", { ascending: false })
     .limit(3);
@@ -217,7 +213,7 @@ async function startCheckin(
     .from("checkins")
     .insert({
       user_id: userId,
-      category_id: categoryId,
+      category_id: category_id,
       coach_id: profile?.coach_id || null,
       status: "in_progress",
       metadata: {
@@ -236,7 +232,7 @@ async function startCheckin(
     .from("messages")
     .insert({
       user_id: userId,
-      category_id: categoryId,
+      category_id: category_id,
       role: "assistant",
       content: questions[0].text,
       content_type: "checkin",
@@ -250,11 +246,10 @@ async function startCheckin(
     .single();
 
   return {
-    checkIn,
-    checkin: checkIn, // For compatibility
+    checkin: checkIn,
     questions,
-    currentQuestion: questions[0],
-    currentQuestionIndex: 0,
+    current_question: questions[0],
+    current_question_index: 0,
     message,
     category: {
       id: category.id,
@@ -271,14 +266,11 @@ async function submitAnswer(
   userId: string,
   body: CheckinRequest,
 ) {
-  // Support both camelCase and snake_case
-  const checkinId = body.checkinId || body.checkin_id;
-  const questionId = body.questionId || body.question_id;
-  const { answer } = body;
+  const { checkin_id, question_id, answer } = body;
 
-  if (!checkinId || !questionId || answer === undefined) {
+  if (!checkin_id || !question_id || answer === undefined) {
     throw new Error(
-      "checkinId/checkin_id, questionId/question_id, and answer are required",
+      "checkin_id, question_id, and answer are required",
     );
   }
 
@@ -286,7 +278,7 @@ async function submitAnswer(
   const { data: checkin, error: checkError } = await supabase
     .from("checkins")
     .select("id, metadata")
-    .eq("id", checkinId)
+    .eq("id", checkin_id)
     .eq("user_id", userId)
     .eq("status", "in_progress")
     .single();
@@ -297,7 +289,7 @@ async function submitAnswer(
 
   // Get question details from template
   const questions = checkin.metadata?.template_questions || [];
-  const question = questions.find((q: CheckinQuestion) => q.id === questionId);
+  const question = questions.find((q: CheckinQuestion) => q.id === question_id);
 
   if (!question) {
     throw new Error("Invalid question_id");
@@ -310,8 +302,8 @@ async function submitAnswer(
   const { error: insertError } = await supabase
     .from("checkin_answers")
     .insert({
-      checkin_id: checkinId,
-      question_id: questionId,
+      checkin_id: checkin_id,
+      question_id: question_id,
       question_text: question.text,
       answer: { value: answer },
       answer_type: question.type,
@@ -325,7 +317,7 @@ async function submitAnswer(
   const { data: answeredQuestions } = await supabase
     .from("checkin_answers")
     .select("question_id, answer")
-    .eq("checkin_id", checkinId);
+    .eq("checkin_id", checkin_id);
 
   const answeredIds = answeredQuestions?.map((a: any) => a.question_id) || [];
   const remainingQuestions = questions.filter((q: CheckinQuestion) =>
@@ -333,20 +325,17 @@ async function submitAnswer(
   );
 
   // Find next question
-  const nextQuestion = remainingQuestions[0] || null;
-  const currentQuestionIndex = nextQuestion
-    ? questions.findIndex((q: CheckinQuestion) => q.id === nextQuestion.id)
+  const next_question = remainingQuestions[0] || null;
+  const current_question_index = next_question
+    ? questions.findIndex((q: CheckinQuestion) => q.id === next_question.id)
     : questions.length;
 
   return {
     success: true,
-    remainingQuestions: remainingQuestions.length,
-    remaining_questions: remainingQuestions.length, // For compatibility
-    nextQuestion,
-    next_question: nextQuestion, // For compatibility
-    currentQuestionIndex,
-    isComplete: remainingQuestions.length === 0,
-    is_complete: remainingQuestions.length === 0, // For compatibility
+    remaining_questions: remainingQuestions.length,
+    next_question: next_question,
+    current_question_index: current_question_index,
+    is_complete: remainingQuestions.length === 0,
   };
 }
 
@@ -355,19 +344,17 @@ async function completeCheckin(
   userId: string,
   body: CheckinRequest,
 ) {
-  // Support both camelCase and snake_case
-  const checkinId = body.checkinId || body.checkin_id;
-  const { proposals } = body;
+  const { checkin_id, proposals } = body;
 
-  if (!checkinId) {
-    throw new Error("checkinId or checkin_id is required");
+  if (!checkin_id) {
+    throw new Error("checkin_id is required");
   }
 
   // Verify checkin belongs to user and is in progress
   const { data: checkin, error: checkError } = await supabase
     .from("checkins")
     .select("id, category_id")
-    .eq("id", checkinId)
+    .eq("id", checkin_id)
     .eq("user_id", userId)
     .eq("status", "in_progress")
     .single();
@@ -380,17 +367,17 @@ async function completeCheckin(
   const { data: answers } = await supabase
     .from("checkin_answers")
     .select("answer")
-    .eq("checkin_id", checkinId);
+    .eq("checkin_id", checkin_id);
 
   // Calculate wellness level based on answers
-  let wellnessLevel = 5; // Default
+  let wellness_level = 5; // Default
   if (answers && answers.length > 0) {
     const numericAnswers = answers
       .map((a: any) => a.answer?.value)
       .filter((v: any) => typeof v === "number");
 
     if (numericAnswers.length > 0) {
-      wellnessLevel = Math.round(
+      wellness_level = Math.round(
         numericAnswers.reduce((sum: number, val: number) => sum + val, 0) /
           numericAnswers.length,
       );
@@ -403,10 +390,10 @@ async function completeCheckin(
     .update({
       status: "completed",
       completed_at: new Date().toISOString(),
-      wellness_level: wellnessLevel,
+      wellness_level: wellness_level,
       proposals: proposals || null,
     })
-    .eq("id", checkinId);
+    .eq("id", checkin_id);
 
   if (updateError) {
     throw new Error("Failed to complete checkin");
@@ -427,7 +414,7 @@ async function completeCheckin(
           importance: proposal.importance || 5,
           metadata: {
             source: "checkin",
-            checkin_id: checkinId,
+            checkin_id: checkin_id,
           },
         })
         .select()
@@ -441,24 +428,19 @@ async function completeCheckin(
   const { data: completedCheckin } = await supabase
     .from("checkins")
     .select("*")
-    .eq("id", checkinId)
+    .eq("id", checkin_id)
     .single();
 
   return {
     success: true,
     checkin: completedCheckin,
-    checkinId,
-    checkin_id: checkinId, // For compatibility
-    completedAt: completedCheckin.completed_at,
-    completed_at: completedCheckin.completed_at, // For compatibility
+    checkin_id: checkin_id,
+    completed_at: completedCheckin.completed_at,
     recommendations: createdRecommendations,
     insights: {
-      totalQuestionsAnswered: answers?.length || 0,
-      total_questions_answered: answers?.length || 0, // For compatibility
-      wellnessLevel,
-      wellness_level: wellnessLevel, // For compatibility
-      categoryId: checkin.category_id,
-      category_id: checkin.category_id, // For compatibility
+      total_questions_answered: answers?.length || 0,
+      wellness_level: wellness_level,
+      category_id: checkin.category_id,
     },
   };
 }
@@ -468,11 +450,10 @@ async function abandonCheckin(
   userId: string,
   body: CheckinRequest,
 ) {
-  // Support both camelCase and snake_case
-  const checkinId = body.checkinId || body.checkin_id;
+  const { checkin_id } = body;
 
-  if (!checkinId) {
-    throw new Error("checkinId or checkin_id is required");
+  if (!checkin_id) {
+    throw new Error("checkin_id is required");
   }
 
   const { error: updateError } = await supabase
@@ -481,7 +462,7 @@ async function abandonCheckin(
       status: "abandoned",
       completed_at: new Date().toISOString(),
     })
-    .eq("id", checkinId)
+    .eq("id", checkin_id)
     .eq("user_id", userId)
     .eq("status", "in_progress");
 
@@ -491,8 +472,7 @@ async function abandonCheckin(
 
   return {
     success: true,
-    checkinId,
-    checkin_id: checkinId, // For compatibility
+    checkin_id: checkin_id,
   };
 }
 

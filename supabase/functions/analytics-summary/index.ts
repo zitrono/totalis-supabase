@@ -4,6 +4,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 import { corsHeaders } from "../_shared/cors.ts";
+import { AnalyticsSummary } from "../_shared/types.ts";
 
 serve(async (req) => {
   // Handle CORS
@@ -99,34 +100,34 @@ serve(async (req) => {
       .gte("created_at", startDate.toISOString());
 
     // Calculate insights
-    const totalCheckIns = checkins?.length || 0;
-    const avgWellnessLevel = checkins && checkins.length > 0
+    const total_check_ins = checkins?.length || 0;
+    const avg_wellness_level = checkins && checkins.length > 0
       ? checkins.reduce((sum, c) => sum + (c.wellness_level || 5), 0) /
         checkins.length
       : 5;
 
-    const categoryBreakdown = checkins?.reduce((acc, checkin) => {
+    const category_breakdown = checkins?.reduce((acc, checkin) => {
       const categoryName = checkin.categories?.name || "Unknown";
       acc[categoryName] = (acc[categoryName] || 0) + 1;
       return acc;
     }, {} as Record<string, number>) || {};
 
-    const insights = generateInsights(checkins || [], avgWellnessLevel, period);
+    const insights = generateInsights(checkins || [], avg_wellness_level, period);
 
     const summary = {
       period,
-      dateRange: {
+      date_range: {
         start: startDate.toISOString(),
         end: now.toISOString(),
       },
-      totalCheckIns,
-      totalMessages: messageCount || 0,
-      avgWellnessLevel: Math.round(avgWellnessLevel * 10) / 10,
-      categoryBreakdown,
-      activeRecommendations: recommendations?.length || 0,
+      total_check_ins,
+      total_messages: messageCount || 0,
+      avg_wellness_level: Math.round(avg_wellness_level * 10) / 10,
+      category_breakdown,
+      active_recommendations: recommendations?.length || 0,
       insights,
       trend: calculateTrend(checkins || []),
-      lastActivity: stats?.last_activity || null,
+      last_activity: stats?.last_activity || null,
     };
 
     return new Response(
