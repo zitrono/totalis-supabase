@@ -111,7 +111,7 @@ describePreviewSafe('SDK Operations - Preview Safe (60% Coverage)', (ctx: Previe
       
       expect(catError).toBeNull()
       expect(categories).toBeDefined()
-      expect(categories.length).toBeGreaterThan(0)
+      expect(categories && categories.length).toBeGreaterThan(0)
       
       // Fetch user's selected categories
       const { data: userCategories, error: ucError } = await supabase
@@ -122,7 +122,7 @@ describePreviewSafe('SDK Operations - Preview Safe (60% Coverage)', (ctx: Previe
       expect(ucError).toBeNull()
       expect(userCategories).toBeDefined()
       // Test users should have categories from seed
-      expect(userCategories.length).toBeGreaterThan(0)
+      expect(userCategories && userCategories.length).toBeGreaterThan(0)
     })
   })
 
@@ -166,8 +166,8 @@ describePreviewSafe('SDK Operations - Preview Safe (60% Coverage)', (ctx: Previe
       
       expect(readError).toBeNull()
       expect(messages).toBeDefined()
-      expect(messages.length).toBeGreaterThan(0)
-      expect(messages[0].id).toBe(created.id)
+      expect(messages && messages.length).toBeGreaterThan(0)
+      expect(messages && messages[0]?.id).toBe(created.id)
     })
   })
 
@@ -225,10 +225,10 @@ describePreviewSafe('SDK Operations - Preview Safe (60% Coverage)', (ctx: Previe
     
     expect(error).toBeNull()
     expect(config).toBeDefined()
-    expect(config.length).toBeGreaterThan(0)
+    expect(config && config.length).toBeGreaterThan(0)
     
     // Should include quick_prompts from seed
-    const quickPrompts = config.find(c => c.key === 'quick_prompts')
+    const quickPrompts = config?.find(c => c.key === 'quick_prompts')
     expect(quickPrompts).toBeDefined()
     expect(quickPrompts?.value).toBeDefined()
   })

@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeAll, afterAll } from '@jest/globals'
-import { SupabaseClient } from '@supabase/supabase-js'
+import { SupabaseClient, createClient } from '@supabase/supabase-js'
 import { TestIsolation, TestUser } from '../helpers/test-isolation'
 import { getTestConfig } from '../config/test-env'
 import * as fs from 'fs'
@@ -9,6 +9,7 @@ describe('SDK Operations - With Test Isolation', () => {
   let isolation: TestIsolation
   let testUsers: TestUser[]
   let supabase: SupabaseClient
+  let serviceClient: SupabaseClient
   let testImagePath: string
 
   beforeAll(async () => {
@@ -23,6 +24,15 @@ describe('SDK Operations - With Test Isolation', () => {
     
     // Get authenticated client for first user
     supabase = await isolation.getAuthenticatedClient(testUsers[0])
+    
+    // Create service client for admin queries
+    const config = getTestConfig()
+    serviceClient = createClient(config.supabaseUrl, config.supabaseServiceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    })
     
     // Create test image file
     testImagePath = path.join(__dirname, `test-image-${isolation.getRunId()}.png`)
@@ -199,15 +209,15 @@ describe('SDK Operations - With Test Isolation', () => {
 
   describe('Cleanup Verification', () => {
     test('should track all created data for cleanup', async () => {
-      // Query test data that will be cleaned up
-      const { data: testProfiles } = await supabase
+      // Query test data that will be cleaned up using service client to bypass RLS
+      const { data: testProfiles } = await serviceClient
         .from('profiles')
         .select('id')
         .filter('metadata->>test_run_id', 'eq', isolation.getRunId())
       
       expect(testProfiles?.length).toBe(3) // We created 3 test users
       
-      const { data: testMessages } = await supabase
+      const { data: testMessages } = await serviceClient
         .from('messages')
         .select('id')
         .filter('metadata->>test_run_id', 'eq', isolation.getRunId())
