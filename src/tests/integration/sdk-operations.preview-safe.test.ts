@@ -275,7 +275,7 @@ describe('SDK Operations - Preview Safe (60% Coverage)', () => {
     expect(profiles && profiles.length).toBeGreaterThanOrEqual(1)
     
     // Verify the current user's profile is present
-    const userProfile = profiles?.find(p => p.id === currentUserId)
+    const userProfile = profiles?.find((p: any) => p.id === currentUserId)
     expect(userProfile).toBeDefined()
     expect(userProfile?.id).toBe(currentUserId)
     
