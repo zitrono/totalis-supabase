@@ -4,6 +4,9 @@ const { Client } = require('pg');
 const yaml = require('js-yaml');
 const fs = require('fs');
 const path = require('path');
+const dns = require('dns');
+const { promisify } = require('util');
+const net = require('net');
 
 /**
  * PostgreSQL Enum Extractor for Supadart
@@ -27,14 +30,88 @@ async function extractEnums(configPath = 'supadart.yaml') {
   
   console.log('🔍 Connecting to database to extract enums...');
   
-  const client = new Client({
-    connectionString: DATABASE_URL,
-    ssl: DATABASE_URL.includes('supabase.co') ? { rejectUnauthorized: false } : false,
-    // Force IPv4 connections for GitHub Actions environment
+  // Multiple strategies to force IPv4 connection for GitHub Actions
+  
+  // Strategy 1: Set DNS resolver to prefer IPv4
+  try {
+    dns.setDefaultResultOrder('ipv4first');
+    console.log('✅ Set DNS to prefer IPv4');
+  } catch (e) {
+    console.log('⚠️ Could not set DNS order:', e.message);
+  }
+  
+  // Strategy 2: Parse URL and resolve to IPv4 explicitly
+  const url = new URL(DATABASE_URL);
+  const isSupabase = url.hostname.includes('supabase.co');
+  
+  const resolve4 = promisify(dns.resolve4);
+  let resolvedHost = url.hostname;
+  
+  try {
+    const addresses = await resolve4(url.hostname);
+    resolvedHost = addresses[0];
+    console.log(`✅ Resolved ${url.hostname} to IPv4: ${resolvedHost}`);
+  } catch (err) {
+    console.log(`⚠️ IPv4 resolution failed, using hostname: ${err.message}`);
+  }
+  
+  // Strategy 3: Use connection object instead of connectionString
+  // This allows pg to respect the family option properly
+  const connectionConfig = {
+    host: resolvedHost,
+    port: parseInt(url.port) || 5432,
+    database: url.pathname.slice(1), // Remove leading slash
+    user: url.username,
+    password: url.password,
+    ssl: isSupabase ? { rejectUnauthorized: false } : false,
+    // Strategy 4: Explicitly disable IPv6 at socket level
     family: 4, // Force IPv4
     keepAlive: true,
-    keepAliveInitialDelayMillis: 30000
-  });
+    keepAliveInitialDelayMillis: 30000,
+    // Additional timeout settings for reliability
+    connectionTimeoutMillis: 10000,
+    query_timeout: 30000,
+    statement_timeout: 30000
+  };
+  
+  // Strategy 5: Test network connectivity before attempting PostgreSQL connection
+  const testConnection = () => {
+    return new Promise((resolve, reject) => {
+      const socket = new net.Socket();
+      socket.setTimeout(5000);
+      
+      socket.on('connect', () => {
+        console.log(`✅ Network connectivity test successful to ${resolvedHost}:${connectionConfig.port}`);
+        socket.destroy();
+        resolve(true);
+      });
+      
+      socket.on('timeout', () => {
+        console.log(`⚠️ Network connectivity test timeout to ${resolvedHost}:${connectionConfig.port}`);
+        socket.destroy();
+        reject(new Error('Connection timeout'));
+      });
+      
+      socket.on('error', (err) => {
+        console.log(`❌ Network connectivity test failed to ${resolvedHost}:${connectionConfig.port}: ${err.message}`);
+        socket.destroy();
+        reject(err);
+      });
+      
+      socket.connect(connectionConfig.port, resolvedHost);
+    });
+  };
+  
+  try {
+    await testConnection();
+  } catch (err) {
+    console.log(`🚨 Pre-connection test failed: ${err.message}`);
+    throw new Error(`Cannot reach database server at ${resolvedHost}:${connectionConfig.port} - ${err.message}`);
+  }
+  
+  console.log(`🔌 Attempting PostgreSQL connection to ${resolvedHost}:${connectionConfig.port} (IPv4 only)`);
+  
+  const client = new Client(connectionConfig);
   
   try {
     await client.connect();
