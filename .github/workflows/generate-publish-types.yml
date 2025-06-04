@@ -153,70 +153,15 @@ jobs:
             -m "Totalis Types v${{ steps.version.outputs.version }}"
           git push origin "v${{ steps.version.outputs.version }}"
           echo "✅ Tag created: v${{ steps.version.outputs.version }}"
-          echo "📦 This will automatically trigger OIDC publishing workflow"
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
           
-      - name: Prepare Package Directory
-        run: |
-          # Create clean package directory
-          mkdir -p publish/totalis_types/lib
-          
-          # Copy and update pubspec template
-          envsubst < package-template/pubspec.yaml.template > publish/totalis_types/pubspec.yaml
-          sed -i "s/VERSION_PLACEHOLDER/${{ steps.version.outputs.version }}/g" publish/totalis_types/pubspec.yaml
-          
-          # Copy and update README template
-          envsubst < package-template/README.md.template > publish/totalis_types/README.md
-          sed -i "s/VERSION_PLACEHOLDER/${{ steps.version.outputs.version }}/g" publish/totalis_types/README.md
-          sed -i "s/TIMESTAMP_PLACEHOLDER/$(date -u +"%Y-%m-%dT%H:%M:%SZ")/g" publish/totalis_types/README.md
-          
-          # Copy LICENSE
-          cp package-template/LICENSE.template publish/totalis_types/LICENSE
-          
-          # Copy and update CHANGELOG
-          envsubst < package-template/CHANGELOG.md.template > publish/totalis_types/CHANGELOG.md
-          sed -i "s/VERSION_PLACEHOLDER/${{ steps.version.outputs.version }}/g" publish/totalis_types/CHANGELOG.md
-          sed -i "s/TIMESTAMP_PLACEHOLDER/$(date -u +"%Y-%m-%dT%H:%M:%SZ")/g" publish/totalis_types/CHANGELOG.md
-          
-      - name: Combine Types
-        run: |
-          # Use enhanced combiner for complete type coverage
-          node tools/combiner/enhanced-combine-types.js \
-            temp/database \
-            temp/edge_function_types.dart \
-            publish/totalis_types/lib/totalis_types.dart \
-            ${{ steps.version.outputs.version }}
-            
-      - name: Install Dependencies
-        run: |
-          cd publish/totalis_types
-          flutter pub get
-          
-      - name: Verify Package Size
-        run: |
-          cd publish/totalis_types
-          SIZE=$(du -sk . | cut -f1)
-          echo "Package size: ${SIZE}KB"
-          if [ $SIZE -gt 500 ]; then
-            echo "⚠️ WARNING: Package size exceeds 500KB"
-          else
-            echo "✅ Package size is acceptable"
-          fi
-          
-      - name: Dry Run Publish
-        run: |
-          cd publish/totalis_types
-          echo "Running dry run publish..."
-          flutter pub publish --dry-run
-          echo "Dry run completed successfully"
-          
-      - name: Publish Package to pub.dev (OIDC)
-        run: |
-          cd publish/totalis_types
-          echo "Publishing package to pub.dev using OIDC..."
-          dart pub publish --force
-          echo "✅ Package published successfully"
+      - name: Trigger OIDC Publishing
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          event-type: publish-types
+          client-payload: '{"tag": "v${{ steps.version.outputs.version }}"}'
           
       - name: Create GitHub Release
         uses: actions/create-release@v1
