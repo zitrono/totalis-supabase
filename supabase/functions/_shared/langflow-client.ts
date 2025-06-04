@@ -330,19 +330,19 @@ Be empathetic, supportive, and encouraging. Keep responses concise but meaningfu
     const insights: string[] = [];
 
     // Streak insights
-    if (summary.streakDays > 7) {
+    if (summary.streak_days > 7) {
       insights.push(
-        `Excellent consistency! Your ${summary.streakDays}-day check-in streak shows real commitment to your wellness.`,
+        `Excellent consistency! Your ${summary.streak_days}-day check-in streak shows real commitment to your wellness.`,
       );
-    } else if (summary.streakDays > 3) {
+    } else if (summary.streak_days > 3) {
       insights.push(
-        `Good momentum! You've checked in for ${summary.streakDays} days in a row. Keep it up!`,
+        `Good momentum! You've checked in for ${summary.streak_days} days in a row. Keep it up!`,
       );
     }
 
     // Completion rate insights
-    if (summary.totalCheckIns > 0) {
-      const completionRate = (summary.completedCheckIns / summary.totalCheckIns) * 100;
+    if (summary.total_check_ins > 0) {
+      const completionRate = (summary.completed_check_ins / summary.total_check_ins) * 100;
       if (completionRate >= 80) {
         insights.push(
           `Outstanding! You've completed ${completionRate.toFixed(0)}% of your check-ins. This dedication is building strong wellness habits.`,
@@ -355,21 +355,21 @@ Be empathetic, supportive, and encouraging. Keep responses concise but meaningfu
     }
 
     // Category focus insights
-    if (summary.topCategories.length > 0) {
-      const topCategory = summary.topCategories[0];
+    if (summary.top_categories.length > 0) {
+      const topCategory = summary.top_categories[0];
       insights.push(
         `You've been focusing on ${topCategory.categoryName} with ${topCategory.count} check-ins. This focused attention helps deepen your self-awareness.`,
       );
 
-      if (summary.topCategories.length > 2) {
+      if (summary.top_categories.length > 2) {
         insights.push(
-          `You're taking a holistic approach by engaging with ${summary.topCategories.length} different wellness areas. This balanced perspective is valuable.`,
+          `You're taking a holistic approach by engaging with ${summary.top_categories.length} different wellness areas. This balanced perspective is valuable.`,
         );
       }
     }
 
     // Encouragement for new users
-    if (summary.totalCheckIns < 5) {
+    if (summary.total_check_ins < 5) {
       insights.push(
         "You're just getting started on your wellness journey. Each check-in helps you understand yourself better.",
       );
