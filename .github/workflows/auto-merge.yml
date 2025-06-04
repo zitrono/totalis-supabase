@@ -6,7 +6,7 @@ on:
   check_suite:
     types: [completed]
   workflow_run:
-    workflows: ["Validate Supabase Assets", "Preview Environment Tests"]
+    workflows: ["Validate Supabase Assets", "CI Tests with Isolation"]
     types: [completed]
 
 jobs:
@@ -78,7 +78,7 @@ jobs:
               'validate-functions',
               'validate-config',
               'run-integration-tests',
-              'test-preview'
+              'test-isolation'
             ];
             
             // Check if all required checks passed

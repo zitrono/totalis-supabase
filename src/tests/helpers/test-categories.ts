@@ -98,3 +98,6 @@ export function getTestUser(indexOrEmail: number | string) {
   }
   return TEST_USERS.find(u => u.email === indexOrEmail) || TEST_USERS[0];
 }
+
+// Export the test user type for TypeScript
+export type TestUser = typeof TEST_USERS[number];

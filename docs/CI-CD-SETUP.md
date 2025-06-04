@@ -1,23 +1,23 @@
-# CI/CD Setup with Supabase GitHub Integration
+# CI/CD Setup with Test Isolation Strategy
 
-This document explains how our CI/CD pipeline works with Supabase preview branches.
+This document explains how our CI/CD pipeline works with unique test run IDs for complete test isolation.
 
 ## Overview
 
-Our CI/CD pipeline uses the Supabase GitHub Integration to automatically create preview environments for each pull request. This ensures that:
+Our CI/CD pipeline uses a test isolation strategy to safely run tests against the production/staging environment. This ensures that:
 
-1. Each PR gets its own isolated Supabase instance
-2. All database migrations, edge functions, and seed data are deployed to preview
-3. Integration tests run against the preview environment
-4. No accidental deployments to production from PRs
+1. Each test run gets a unique run ID for complete data isolation
+2. All test data is automatically tagged and cleaned up after tests
+3. Integration tests run directly against existing infrastructure
+4. No external dependencies or preview environment creation delays
 
 ## Prerequisites
 
-### 1. Supabase GitHub Integration (✅ Already Enabled)
-- Installed via Supabase Dashboard → Settings → Integrations → GitHub
-- Connected to repository: `zitrono/totalis-supabase`
-- Production branch: `main`
-- Branching enabled for automatic preview environments
+### 1. Test Isolation Environment (✅ Configured)
+- Test data cleanup function deployed to production
+- Unique run ID generation for CI/CD and local testing
+- Automatic cleanup of test users and data after test completion
+- Isolated test execution without affecting production data
 
 ### 2. Required GitHub Secrets
 - `SUPABASE_ACCESS_TOKEN` - Personal access token from https://supabase.com/dashboard/account/tokens
@@ -34,103 +34,105 @@ Our CI/CD pipeline uses the Supabase GitHub Integration to automatically create 
 
 ## Workflow Files
 
-### 1. `pre-preview.yml` - Static Validation
+### 1. `validate.yml` - Static Validation and Testing
 - **Triggers**: On every PR that changes Supabase files
-- **Purpose**: Fast validation before creating preview environment
+- **Purpose**: Fast validation and isolated testing
 - **Checks**:
   - Migration naming convention
   - SQL syntax validation
   - TypeScript type checking for edge functions
   - No hardcoded secrets
   - Required files present
+- **Testing**:
+  - Run integration tests with unique run ID
+  - Automatic cleanup of test data after completion
 
-### 2. `validate.yml` - Full Validation
-- **Triggers**: On PR changes to Supabase files
-- **Purpose**: Comprehensive validation and testing
-- **Jobs**:
-  - Validate migrations
-  - Validate edge functions
-  - Validate config.toml
-  - Run integration tests (against main project)
-
-### 3. `preview-tests.yml` - Preview Environment Testing
-- **Triggers**: On PR open/sync/reopen
-- **Purpose**: Run tests against preview environment
+### 2. `ci-tests.yml` - Isolated Integration Testing
+- **Triggers**: On PR changes and manually
+- **Purpose**: Comprehensive testing with complete isolation
 - **Process**:
-  1. Waits for Supabase Preview check to complete
-  2. Automatically gets preview branch credentials
-  3. Runs integration tests against preview
-  4. Comments results on PR
-- **Requirements**: Preview environment must be ready and accessible
+  1. Generate unique test run ID (`gh_${GITHUB_RUN_ID}`)
+  2. Create isolated test users with timestamp-based emails
+  3. Run all integration tests against production/staging
+  4. Automatic cleanup in `always()` block
+  5. Comment results on PR with cleanup statistics
 
-### 4. `production.yml` - Production Deployment
+### 3. `production.yml` - Production Deployment
 - **Triggers**: On push to `main` branch
 - **Purpose**: Deploy to production
 - **Process**:
-  1. Backup database (optional)
-  2. Apply migrations
-  3. Deploy edge functions
-  4. Delete orphaned functions
-  5. Run smoke tests
+  1. Apply migrations
+  2. Deploy edge functions
+  3. Delete orphaned functions
+  4. Run smoke tests
+  5. Trigger type generation and publishing
 
-## How Preview Environments Work
+### 4. `cleanup-test-data.yml` - Scheduled Cleanup
+- **Triggers**: Daily at 2 AM UTC
+- **Purpose**: Remove orphaned test data older than 7 days
+- **Process**:
+  1. Identify test data older than 7 days
+  2. Clean up database records
+  3. Remove auth users
+  4. Report cleanup statistics
 
-1. **Automatic Creation**: When you open a PR, Supabase automatically:
-   - Creates a new branch project
-   - Applies all migrations
-   - Seeds the database
-   - Deploys edge functions
-   - Comments on PR with preview details
+## How Test Isolation Works
 
-2. **Automatic Testing**: The `preview-tests.yml` workflow:
-   - Waits for preview to be ready
-   - Gets credentials using a third-party action
-   - Runs all integration tests
-   - Reports results on PR
+1. **Unique Run ID Generation**: Each test execution generates a unique identifier:
+   - **CI/CD**: Uses GitHub run ID (`gh_${GITHUB_RUN_ID}`)
+   - **Local**: Uses timestamp and random string (`local_${timestamp}_${random}`)
 
-3. **Lifecycle**:
-   - Preview environments pause after 5 minutes of inactivity
-   - Auto-resume when accessed
-   - Auto-delete 20 hours after PR is closed/merged
+2. **Isolated Test Data**: All test data is tagged with the run ID:
+   - Test users created with unique email addresses
+   - Database records include `test_run_id` in metadata
+   - Complete isolation between test runs
+
+3. **Automatic Cleanup**: After test completion:
+   - `cleanup_test_data(run_id)` removes all database records
+   - Auth users are deleted via admin API
+   - No test data pollution in production environment
 
 ## Edge Function Deployment
 
-### Preview Branches
-- All edge functions are automatically deployed by Supabase
-- No manual deployment needed
-- Functions are available at: `https://{preview-id}.supabase.co/functions/v1/{function-name}`
+### Testing
+- Edge functions are tested against the production environment
+- Tests use isolated test data that is cleaned up automatically
+- Function validation includes TypeScript compilation and syntax checks
 
 ### Production
 - Functions deploy when PR is merged to main
 - Orphaned functions (removed from Git) are automatically deleted
 - Maintains Git as single source of truth
+- Functions are available at: `https://qdqbrqnqttyjegiupvri.supabase.co/functions/v1/{function-name}`
 
 ## Troubleshooting
 
-### Preview Environment Not Created
-- Check Supabase bot comment on PR
-- Ensure GitHub Integration is enabled in Supabase Dashboard
-- Verify repository connection in Supabase settings
+### Test Isolation Issues
+- Check that `GITHUB_RUN_ID` environment variable is available in CI
+- Verify `SUPABASE_SERVICE_ROLE_KEY` has admin permissions
+- Ensure cleanup function `cleanup_test_data` exists in the database
 
-### Tests Failing on Preview
-- Check if preview is fully provisioned (wait 3-5 minutes)
-- Verify edge functions are deployed
-- Check for migration errors in Supabase Dashboard
+### Tests Failing
+- Check if all required environment variables are set
+- Verify database connectivity and permissions
+- Review test logs for specific error messages
+- Ensure edge functions are deployed correctly
 
-### Can't Get Preview Credentials
-- The third-party action might need updating
-- Check SUPABASE_ACCESS_TOKEN has correct permissions
-- Ensure the preview branch exists in Supabase dashboard
-- Verify the branch name matches the PR branch
+### Cleanup Not Working
+- Verify service role key has admin API access
+- Check if test users were created successfully
+- Review cleanup function logs in Supabase Dashboard
+- Ensure test data includes proper `test_run_id` metadata
 
 ## Future Improvements
 
-1. **Native Supabase CLI Support**: When Supabase CLI adds support for getting branch API keys, we can remove the third-party action
-2. **Faster Preview Creation**: Currently takes 3-5 minutes, may improve with Supabase updates
-3. **Cost Optimization**: Consider auto-pausing preview branches after successful tests
+1. **Performance Optimization**: Optimize test execution time and parallel test running
+2. **Enhanced Monitoring**: Add metrics collection for test execution and cleanup effectiveness
+3. **Smart Cleanup**: Implement more intelligent cleanup strategies based on test data age and usage patterns
 
 ## References
 
-- [Supabase Branching Documentation](https://supabase.com/docs/guides/platform/branching)
-- [GitHub Integration Guide](https://supabase.com/docs/guides/platform/github-integration)
-- [CI/CD Examples](https://supabase.com/docs/guides/platform/github-actions)
+- [Supabase JavaScript Client](https://supabase.com/docs/reference/javascript)
+- [Supabase Admin API](https://supabase.com/docs/guides/auth/auth-admin)
+- [GitHub Actions Documentation](https://docs.github.com/en/actions)
+- [Test Isolation Best Practices](https://supabase.com/docs/guides/testing)
