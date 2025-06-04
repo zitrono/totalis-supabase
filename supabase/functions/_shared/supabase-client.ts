@@ -28,14 +28,14 @@ export async function getUserContext(
 ): Promise<UserContext> {
   // Get user's coach
   const { data: userProfile } = await supabase
-    .from("user_profiles")
+    .from("profiles")
     .select("coach_id")
-    .eq("id", userId)
+    .eq("user_id", userId)
     .single();
 
   // Get recent categories from check-ins
   const { data: recentCheckIns } = await supabase
-    .from("check_ins")
+    .from("checkins")
     .select("category_id, created_at")
     .eq("user_id", userId)
     .order("created_at", { ascending: false })
@@ -46,18 +46,29 @@ export async function getUserContext(
     ...new Set(recentCheckIns?.map((c: any) => c.category_id) || []),
   ] as string[];
 
-  // Get check-in history
+  // Get check-in history with proper mapping
   const { data: checkInHistory } = await supabase
-    .from("check_ins")
+    .from("checkins")
     .select("*")
     .eq("user_id", userId)
     .order("created_at", { ascending: false })
     .limit(20);
 
+  // Map to UserContext interface with snake_case
+  const mappedCheckInHistory = (checkInHistory || []).map((checkin: any) => ({
+    id: checkin.id,
+    user_id: checkin.user_id,
+    category_id: checkin.category_id,
+    status: checkin.status,
+    started_at: checkin.created_at,
+    completed_at: checkin.completed_at,
+    responses: checkin.responses || [],
+  }));
+
   return {
-    userId,
-    coachId: userProfile?.coach_id || "",
-    recentCategories: recentCategories.slice(0, 5),
-    checkInHistory: checkInHistory || [],
+    user_id: userId,
+    coach_id: userProfile?.coach_id || "",
+    recent_categories: recentCategories.slice(0, 5),
+    check_in_history: mappedCheckInHistory,
   };
 }

@@ -6,14 +6,9 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 import { corsHeaders } from "../_shared/cors.ts";
 
 interface ErrorReportRequest {
-  // Support both camelCase (new standard) and snake_case (legacy)
-  userId?: string;
   user_id?: string;
-  errorType?: string;
   error_type?: string;
-  errorMessage?: string;
   error_message?: string;
-  stackTrace?: string;
   stack_trace?: string;
   metadata?: Record<string, any>;
 }
@@ -61,11 +56,11 @@ serve(async (req) => {
 
     const body = await req.json() as ErrorReportRequest;
     
-    // Support both camelCase (new standard) and snake_case (legacy)
-    const userId = body.userId || body.user_id || user.id;
-    const errorType = body.errorType || body.error_type;
-    const errorMessage = body.errorMessage || body.error_message;
-    const stackTrace = body.stackTrace || body.stack_trace;
+    // Extract fields using snake_case
+    const userId = body.user_id || user.id;
+    const errorType = body.error_type;
+    const errorMessage = body.error_message;
+    const stackTrace = body.stack_trace;
     const metadata = body.metadata || {};
 
     // Validate required fields
@@ -73,7 +68,7 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ 
           error: "Missing required fields",
-          details: "errorType/error_type and errorMessage/error_message are required" 
+          details: "error_type and error_message are required" 
         }),
         {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -93,7 +88,7 @@ serve(async (req) => {
         metadata: {
           ...metadata,
           platform: metadata.platform || "unknown",
-          app_version: metadata.appVersion || metadata.app_version || "unknown",
+          app_version: metadata.app_version || "unknown",
           reported_at: new Date().toISOString(),
         }
       });
@@ -121,7 +116,7 @@ serve(async (req) => {
           has_stack_trace: !!stackTrace,
         },
         platform: metadata.platform || "unknown",
-        app_version: metadata.appVersion || metadata.app_version || "unknown",
+        app_version: metadata.app_version || "unknown",
       });
 
     return new Response(

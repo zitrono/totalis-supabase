@@ -59,13 +59,14 @@ serve(async (req) => {
     }
 
     // Get request body
+    const body = await req.json();
     const {
       message,
-      contextType,
-      contextId,
-      includeHistory = true,
-      conversationId = crypto.randomUUID(),
-    } = await req.json();
+      context_type,
+      context_id,
+      include_history = true,
+      conversation_id = crypto.randomUUID(),
+    } = body;
 
 
     if (!message) {
@@ -80,7 +81,7 @@ serve(async (req) => {
 
     // Get chat history if requested
     let chatHistory: ChatMessage[] = [];
-    if (includeHistory) {
+    if (include_history) {
       const { data: messages } = await supabase
         .from("messages")
         .select("*")
@@ -90,27 +91,27 @@ serve(async (req) => {
 
       chatHistory = messages?.map((m) => ({
         id: m.id,
-        userId: m.user_id,
+        user_id: m.user_id,
         message: m.content,
-        isUser: m.role === "user",
+        is_user: m.role === "user",
         timestamp: m.created_at,
-        contextType: m.metadata?.context_type,
-        contextId: m.metadata?.context_id,
-      })).reverse() || [];
+        context_type: m.metadata?.context_type,
+        context_id: m.metadata?.context_id,
+      } as ChatMessage)).reverse() || [];
     }
 
     // Save user's message
-    const { data: userMessage, error: saveUserError } = await supabase
+    const { data: user_message, error: saveUserError } = await supabase
       .from("messages")
       .insert({
         user_id: user.id,
         content: message,
         role: "user",
-        category_id: contextType === "category" ? contextId : null,
-        conversation_id: conversationId,
+        category_id: context_type === "category" ? context_id : null,
+        conversation_id: conversation_id,
         metadata: {
-          context_type: contextType,
-          context_id: contextId,
+          context_type: context_type,
+          context_id: context_id,
         },
         created_at: new Date().toISOString(),
       })
@@ -124,7 +125,7 @@ serve(async (req) => {
     // Get user context
     const context = await getUserContext(supabase, user.id);
 
-    // Get AI response from Langflow (mocked)
+    // Get AI response from Langflow
     const aiResponse = await langflowClient.getChatResponse(
       message,
       chatHistory,
@@ -132,18 +133,18 @@ serve(async (req) => {
     );
 
     // Save AI response
-    const { data: aiMessage, error: saveAiError } = await supabase
+    const { data: ai_message, error: saveAiError } = await supabase
       .from("messages")
       .insert({
         user_id: user.id,
         content: aiResponse,
         role: "assistant",
-        category_id: contextType === "category" ? contextId : null,
-        conversation_id: conversationId,
-        coach_id: context.coachId,
+        category_id: context_type === "category" ? context_id : null,
+        conversation_id: conversation_id,
+        coach_id: context.coach_id,
         metadata: {
-          context_type: contextType,
-          context_id: contextId,
+          context_type: context_type,
+          context_id: context_id,
         },
         created_at: new Date().toISOString(),
       })
@@ -158,18 +159,18 @@ serve(async (req) => {
     const { data: coach } = await supabase
       .from("coaches")
       .select("name, voice")
-      .eq("id", context.coachId)
+      .eq("id", context.coach_id)
       .single();
 
     // Return response
     return new Response(
       JSON.stringify({
         response: aiResponse,
-        conversationId: conversationId,
-        userMessage: userMessage,
-        aiMessage: aiMessage,
+        conversation_id: conversation_id,
+        user_message: user_message,
+        ai_message: ai_message,
         coach: coach,
-        contextUsed: contextType,
+        context_used: context_type,
         metadata: {},
       }),
       {
@@ -199,36 +200,3 @@ serve(async (req) => {
     );
   }
 });
-
-// AI response generation (mocked - replace with actual AI service)
-async function generateAIResponse(
-  userMessage: string,
-  context: any,
-): Promise<string> {
-  // TODO: Replace with actual AI integration (OpenAI/Langflow)
-
-  // For now, return contextual mock responses
-  const greetings = ["hello", "hi", "hey", "good morning", "good afternoon"];
-  const isGreeting = greetings.some((g) =>
-    userMessage.toLowerCase().includes(g)
-  );
-
-  if (isGreeting) {
-    return `Hello ${context.userName}! I'm ${context.coachName}. How can I support your wellness journey today?`;
-  }
-
-  if (userMessage.toLowerCase().includes("how are you")) {
-    return `I'm here to support you, ${context.userName}. Thank you for asking! How are you feeling today?`;
-  }
-
-  if (context.checkinId) {
-    return `I understand you're going through a check-in. ${userMessage} - That's valuable insight. Can you tell me more about how this makes you feel?`;
-  }
-
-  if (context.categoryId) {
-    return `Regarding your wellness journey, ${userMessage} - I hear you. What specific aspect would you like to explore further?`;
-  }
-
-  // Default response
-  return `Thank you for sharing that, ${context.userName}. ${context.coachPersonality} How would you like to proceed with this?`;
-}

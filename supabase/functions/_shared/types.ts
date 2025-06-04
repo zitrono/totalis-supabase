@@ -1,24 +1,24 @@
 // Shared types for Edge Functions
 
 export interface UserContext {
-  userId: string;
-  coachId: string;
-  recentCategories: string[];
-  checkInHistory: CheckIn[];
+  user_id: string;
+  coach_id: string;
+  recent_categories: string[];
+  check_in_history: CheckIn[];
 }
 
 export interface CheckIn {
   id: string;
-  userId: string;
-  categoryId: string;
+  user_id: string;
+  category_id: string;
   status: "in_progress" | "completed" | "abandoned";
-  startedAt: string;
-  completedAt?: string;
+  started_at: string;
+  completed_at?: string;
   responses?: CheckInResponse[];
 }
 
 export interface CheckInResponse {
-  questionId: string;
+  question_id: string;
   question: string;
   answer: string;
   timestamp: string;
@@ -26,42 +26,42 @@ export interface CheckInResponse {
 
 export interface Recommendation {
   id?: string;
-  userId: string;
+  user_id: string;
   title: string;
   insight: string;
   why: string;
   action: string;
-  categoryId: string;
+  category_id: string;
   importance: number;
   relevance: string;
-  createdAt?: string;
+  created_at?: string;
 }
 
 export interface ChatMessage {
   id?: string;
-  userId: string;
+  user_id: string;
   message: string;
-  isUser: boolean;
+  is_user: boolean;
   timestamp: string;
-  contextType?: "category" | "checkin" | "recommendation";
-  contextId?: string;
+  context_type?: "category" | "checkin" | "recommendation";
+  context_id?: string;
 }
 
 export interface AnalyticsSummary {
-  userId: string;
+  user_id: string;
   period: "week" | "month" | "all";
-  totalCheckIns: number;
-  completedCheckIns: number;
-  topCategories: CategoryStat[];
-  streakDays: number;
+  total_check_ins: number;
+  completed_check_ins: number;
+  top_categories: CategoryStat[];
+  streak_days: number;
   insights: string[];
 }
 
 export interface CategoryStat {
-  categoryId: string;
-  categoryName: string;
+  category_id: string;
+  category_name: string;
   count: number;
-  lastUsed: string;
+  last_used: string;
 }
 
 export interface LangflowRequest {
