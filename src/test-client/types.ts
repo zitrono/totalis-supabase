@@ -12,7 +12,7 @@ export interface UserProfile {
   user_id: string;
   name: string;
   date_of_birth: string;
-  sex: 'male' | 'female' | 'other';
+  sex: 'male' | 'female';
   coach_id: string;
   created_at: string;
   updated_at: string;
@@ -131,7 +131,7 @@ export interface PaginatedResponse<T> {
 export interface CreateUserProfileRequest {
   name: string;
   dateOfBirth: Date;
-  sex: 'male' | 'female' | 'other';
+  sex: 'male' | 'female';
   coachId?: string;
 }
 

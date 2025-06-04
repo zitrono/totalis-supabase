@@ -7,7 +7,7 @@ dart_class: true
 include_views: true
 include_enums: true
 enums:
-  sex: [male, female, non_binary, other, prefer_not_to_say]
+  sex: [male, female]
   role: [user, assistant, system]
   content_type: [text, voice, checkin, feedback]
   status: [active, completed, abandoned]

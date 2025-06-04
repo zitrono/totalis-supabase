@@ -140,7 +140,7 @@ program
               profile = await client.createUserProfile({
                 name: 'Interactive Test User',
                 dateOfBirth: new Date('1985-05-15'),
-                sex: 'other'
+                sex: 'female'
               });
               console.log('✓ Profile created:', profile.name);
             } else {

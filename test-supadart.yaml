@@ -9,7 +9,7 @@ include_enums: true
 # Add all database enums identified from schema
 enums:
   # From coaches and profiles tables
-  sex: [male, female, non_binary, other, prefer_not_to_say]
+  sex: [male, female]
   # From messages table  
   role: [user, assistant, system]
   content_type: [text, voice, checkin, feedback]
