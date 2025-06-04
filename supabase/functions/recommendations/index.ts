@@ -139,9 +139,9 @@ serve(async (req) => {
     // Generate AI prompt based on context
     const userContext = {
       avg_wellness_level: avgWellnessLevel,
-      recent_categories: recentCheckins.map(c => c.categories?.name).filter(Boolean),
-      categories_needing_attention: categoriesNeedingAttention.map(c => c?.name).filter(Boolean),
-      favorite_categories: userCategories.map(uc => uc.categories?.name).filter(Boolean),
+      recent_categories: recentCheckins.map(c => (c.categories as any)?.name).filter(Boolean),
+      categories_needing_attention: categoriesNeedingAttention.map(c => (c as any)?.name).filter(Boolean),
+      favorite_categories: userCategories.map(uc => (uc.categories as any)?.name).filter(Boolean),
       last_checkin_date: recentCheckins[0]?.completed_at,
       context_type,
       specific_category: category_id
