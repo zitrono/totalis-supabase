@@ -1,0 +1,142 @@
+name: Retry Publish Types Package
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (e.g., 1.0.151)'
+        required: true
+        type: string
+
+env:
+  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+
+jobs:
+  retry-publish:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write      # Required for OIDC authentication to pub.dev
+      contents: read       # To read code
+    
+    steps:
+      - name: Checkout repository at tag
+        uses: actions/checkout@v4
+        with:
+          ref: v${{ github.event.inputs.version }}
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.19.0'
+          
+      - name: Setup Dart
+        uses: dart-lang/setup-dart@v1
+        
+      - name: Install Global Dependencies
+        run: |
+          dart pub global activate supadart
+          
+      - name: Install Enum Extractor Dependencies
+        run: |
+          cd tools/enum-extractor
+          npm ci
+          
+      - name: Install Edge Function Parser Dependencies
+        run: |
+          cd tools/edge-function-parser
+          npm ci
+          
+      - name: Generate Database Types
+        env:
+          DATABASE_URL: postgresql://postgres.qdqbrqnqttyjegiupvri:${{ secrets.SUPABASE_DB_PASSWORD }}@aws-0-eu-central-1.pooler.supabase.com:5432/postgres
+          NODE_OPTIONS: --dns-result-order=ipv4first
+        run: |
+          mkdir -p temp/database
+          cd temp/database
+          
+          # Auto-extract enums from database (fully enum-agnostic)
+          echo "🔍 Auto-extracting enums from database..."
+          node ../../tools/enum-extractor/extract-enums.js supadart.yaml
+          echo "✅ Auto-extraction completed!"
+          
+          # Generate complete database types with auto-extracted enums
+          echo "🚀 Generating database types..."
+          supadart
+            
+      - name: Build Edge Function Parser
+        run: |
+          cd tools/edge-function-parser
+          npm run build
+          
+      - name: Generate Edge Function Types
+        run: |
+          cd tools/edge-function-parser
+          # Use enhanced parser for complete interface extraction
+          node dist/enhanced-parser.js \
+            --input ../../supabase/functions \
+            --output ../../temp
+            
+      - name: Prepare Package Directory
+        run: |
+          # Create clean package directory
+          mkdir -p publish/totalis_types/lib
+          
+          # Copy and update pubspec template
+          envsubst < package-template/pubspec.yaml.template > publish/totalis_types/pubspec.yaml
+          sed -i "s/VERSION_PLACEHOLDER/${{ github.event.inputs.version }}/g" publish/totalis_types/pubspec.yaml
+          
+          # Copy and update README template
+          envsubst < package-template/README.md.template > publish/totalis_types/README.md
+          sed -i "s/VERSION_PLACEHOLDER/${{ github.event.inputs.version }}/g" publish/totalis_types/README.md
+          sed -i "s/TIMESTAMP_PLACEHOLDER/$(date -u +"%Y-%m-%dT%H:%M:%SZ")/g" publish/totalis_types/README.md
+          
+          # Copy LICENSE
+          cp package-template/LICENSE.template publish/totalis_types/LICENSE
+          
+          # Copy and update CHANGELOG
+          envsubst < package-template/CHANGELOG.md.template > publish/totalis_types/CHANGELOG.md
+          sed -i "s/VERSION_PLACEHOLDER/${{ github.event.inputs.version }}/g" publish/totalis_types/CHANGELOG.md
+          sed -i "s/TIMESTAMP_PLACEHOLDER/$(date -u +"%Y-%m-%dT%H:%M:%SZ")/g" publish/totalis_types/CHANGELOG.md
+          
+      - name: Combine Types
+        run: |
+          # Use enhanced combiner for complete type coverage
+          node tools/combiner/enhanced-combine-types.js \
+            temp/database \
+            temp/edge_function_types.dart \
+            publish/totalis_types/lib/totalis_types.dart \
+            ${{ github.event.inputs.version }}
+            
+      - name: Install Dependencies
+        run: |
+          cd publish/totalis_types
+          flutter pub get
+          
+      - name: Verify Package
+        run: |
+          cd publish/totalis_types
+          echo "📦 Package structure:"
+          ls -la
+          echo ""
+          echo "📄 Package info:"
+          head -20 pubspec.yaml
+          
+      - name: Dry Run Publish
+        run: |
+          cd publish/totalis_types
+          echo "Running dry run publish..."
+          flutter pub publish --dry-run
+          echo "Dry run completed successfully"
+          
+      - name: Publish Package to pub.dev (OIDC)
+        run: |
+          cd publish/totalis_types
+          echo "Publishing package v${{ github.event.inputs.version }} to pub.dev using OIDC..."
+          dart pub publish --force
+          echo "✅ Package published successfully"
