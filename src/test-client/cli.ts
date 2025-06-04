@@ -130,7 +130,7 @@ program
       try {
         switch (command) {
           case 'auth':
-            const auth = await client.signInAnonymously();
+            const auth = await client.signInWithEmail('test1@totalis.app', 'Test123!@#');
             console.log('✓ Signed in:', auth.user.id);
             break;
 
