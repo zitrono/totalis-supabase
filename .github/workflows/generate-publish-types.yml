@@ -52,7 +52,7 @@ jobs:
           
       - name: Generate Database Types
         env:
-          DATABASE_URL: postgresql://postgres:${{ secrets.SUPABASE_DB_PASSWORD }}@db.qdqbrqnqttyjegiupvri.supabase.co:5432/postgres
+          DATABASE_URL: postgresql://postgres.qdqbrqnqttyjegiupvri:${{ secrets.SUPABASE_DB_PASSWORD }}@aws-0-eu-central-1.pooler.supabase.com:5432/postgres
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
           NODE_OPTIONS: --dns-result-order=ipv4first
           UV_USE_IO_URING: 0
