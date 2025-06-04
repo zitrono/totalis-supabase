@@ -92,7 +92,7 @@ export const TEST_USERS = [
 /**
  * Get a test user by index or email
  */
-export function getTestUser(indexOrEmail: number | string) {
+export function getTestUser(indexOrEmail: number | string): typeof TEST_USERS[0] {
   if (typeof indexOrEmail === 'number') {
     return TEST_USERS[indexOrEmail % TEST_USERS.length];
   }

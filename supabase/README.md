@@ -85,7 +85,7 @@ The `seed.sql` file contains essential initial data:
 - Categories (Health domains)
 - App configuration
 
-This runs automatically on preview environments but NOT on production.
+This runs automatically during local development and testing but NOT on production.
 
 ## Storage Buckets
 
@@ -97,11 +97,11 @@ Bucket configuration is managed in `config.toml`:
 
 ## CI/CD Integration
 
-All changes are deployed via GitHub Actions:
-1. **Pull Request** → Preview environment with auto-cleanup
-2. **Merge to main** → Production deployment with approval
+All changes are deployed via GitHub Actions with test isolation:
+1. **Pull Request** → Isolated testing against production/staging with automatic cleanup
+2. **Merge to main** → Production deployment with validation
 
-See `.github/workflows/` for pipeline configuration.
+Tests use unique run IDs to ensure complete data isolation without external dependencies. See `.github/workflows/` for pipeline configuration.
 
 ## Environment Variables
 

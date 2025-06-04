@@ -141,7 +141,7 @@ runs:
             'validate-functions',
             'validate-config',
             'run-integration-tests',
-            'test-preview',
+            'test-isolation',
             'enable-auto-merge',
             'auto-merge'
           ];

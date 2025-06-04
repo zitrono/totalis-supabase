@@ -358,7 +358,7 @@ Be empathetic, supportive, and encouraging. Keep responses concise but meaningfu
     if (summary.top_categories.length > 0) {
       const topCategory = summary.top_categories[0];
       insights.push(
-        `You've been focusing on ${topCategory.categoryName} with ${topCategory.count} check-ins. This focused attention helps deepen your self-awareness.`,
+        `You've been focusing on ${topCategory.category_name} with ${topCategory.count} check-ins. This focused attention helps deepen your self-awareness.`,
       );
 
       if (summary.top_categories.length > 2) {

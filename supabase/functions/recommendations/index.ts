@@ -55,7 +55,7 @@ serve(async (req) => {
     console.log("Auth check:", {
       hasUser: !!user,
       authError: authError?.message,
-      headers: Object.fromEntries(req.headers.entries()),
+      headers: Object.fromEntries(req.headers),
     });
 
     if (authError || !user) {
