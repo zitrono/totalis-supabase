@@ -54,6 +54,7 @@ jobs:
         env:
           DATABASE_URL: postgresql://postgres:${{ secrets.SUPABASE_DB_PASSWORD }}@db.qdqbrqnqttyjegiupvri.supabase.co:5432/postgres
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          NODE_OPTIONS: --dns-result-order=ipv4first
         run: |
           mkdir -p temp/database
           cd temp/database
