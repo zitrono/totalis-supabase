@@ -2,7 +2,7 @@ import { describe as jestDescribe, beforeAll, test } from '@jest/globals'
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import { getTestConfig } from '../config/test-env'
 import { skipIfPreview } from './skip-auth'
-import { getTestUser, TEST_USERS } from './test-categories'
+import { getTestUser, TEST_USERS, TestUser } from './test-categories'
 
 let previewSupabase: SupabaseClient | null = null;
 
@@ -131,7 +131,7 @@ export interface PreviewTestContext {
   /**
    * Get current test user info
    */
-  currentUser(): typeof TEST_USERS[0];
+  currentUser(): TestUser;
   
   /**
    * Sign out current user
