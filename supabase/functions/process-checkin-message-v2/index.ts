@@ -1,38 +1,15 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0'
 import { corsHeaders } from '../_shared/cors.ts'
+import { LangflowCheckinResponse } from '../_shared/types.ts'
 
 interface ProcessMessageRequest {
-  ref_checkin_id: string
+  checkin_id: string
   user_id: string
   message: string
   answer_type?: 'text' | 'scale' | 'radio' | 'checkbox'
   answer_value?: any
   question_index: number
-}
-
-interface LangflowResponse {
-  next_question?: {
-    text: string
-    type: 'text' | 'scale' | 'radio' | 'checkbox'
-    options?: string[]
-    scale_min?: number
-    scale_max?: number
-  }
-  is_complete: boolean
-  summary?: string
-  insight?: string
-  wellness_level?: number
-  recommendations?: Array<{
-    type: 'first' | 'second'
-    title?: string
-    action?: string
-    insight?: string
-    why?: string
-    importance: number
-    relevance?: string
-    recommended_categories?: string[]
-  }>
 }
 
 serve(async (req) => {
@@ -167,7 +144,7 @@ serve(async (req) => {
     // TODO: Replace with actual Langflow API call
     const isLastQuestion = question_index + 1 >= (checkin.categories.max_questions || 10)
     
-    const mockResponse: LangflowResponse = {
+    const mockResponse: LangflowCheckinResponse = {
       is_complete: isLastQuestion,
       ...(isLastQuestion ? {
         summary: `Based on our conversation about ${checkin.categories.name}, I can see that you're making progress in understanding your patterns.`,

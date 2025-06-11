@@ -1,25 +1,12 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0'
 import { corsHeaders } from '../_shared/cors.ts'
+import { LangflowProposalResponse } from '../_shared/types.ts'
 
 interface ProposalRequest {
   user_id: string
   coach_id?: string
   context?: string
-}
-
-interface LangflowResponse {
-  proposal: {
-    category_id: string
-    category_name: string
-    rationale: string
-    urgency: 'low' | 'medium' | 'high'
-    personalized_message: string
-  }
-  metadata?: {
-    analysis_factors: string[]
-    confidence_score: number
-  }
 }
 
 serve(async (req) => {
@@ -138,7 +125,7 @@ serve(async (req) => {
     // Select a category with the longest gap
     const categoryWithGap = checkinPatterns.categories_with_gaps[0]
     
-    const mockResponse: LangflowResponse = {
+    const mockResponse: LangflowProposalResponse = {
       proposal: {
         category_id: categoryWithGap?.category_id || allCategories?.[0]?.category_id || '',
         category_name: categoryWithGap?.category_name || allCategories?.[0]?.category_name || 'Wellness',

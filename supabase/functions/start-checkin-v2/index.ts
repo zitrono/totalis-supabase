@@ -1,21 +1,11 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0'
 import { corsHeaders } from '../_shared/cors.ts'
+import { LangflowQuestionResponse } from '../_shared/types.ts'
 
 interface StartCheckinRequest {
   category_id: string
   user_id: string
-}
-
-interface LangflowResponse {
-  questions: Array<{
-    text: string
-    type: 'text' | 'scale' | 'radio' | 'checkbox'
-    options?: string[]
-    scale_min?: number
-    scale_max?: number
-  }>
-  session_id: string
 }
 
 serve(async (req) => {
@@ -123,7 +113,7 @@ serve(async (req) => {
 
     // For now, return mock questions as Langflow stub
     // TODO: Replace with actual Langflow API call
-    const mockQuestions: LangflowResponse = {
+    const mockQuestions: LangflowQuestionResponse = {
       questions: [
         {
           text: `How are you feeling about your ${category.name.toLowerCase()} today?`,

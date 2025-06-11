@@ -1,6 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0'
 import { corsHeaders } from '../_shared/cors.ts'
+import { LangflowChatResponse } from '../_shared/types.ts'
 
 interface ChatRequest {
   user_id: string
@@ -11,20 +12,6 @@ interface ChatRequest {
     checkin_id?: string
     recommendation_id?: string
   }
-}
-
-interface LangflowResponse {
-  response: string
-  metadata?: {
-    tokens_used?: number
-    model?: string
-    coach_personality?: string
-  }
-  suggested_actions?: Array<{
-    type: string
-    category_id?: string
-    action_text?: string
-  }>
 }
 
 serve(async (req) => {
@@ -177,7 +164,7 @@ serve(async (req) => {
 
     // For now, return mock response as Langflow stub
     // TODO: Replace with actual Langflow API call
-    const mockResponse: LangflowResponse = {
+    const mockResponse: LangflowChatResponse = {
       response: `I understand you're reaching out about ${context?.category_id ? 'this wellness area' : 'your wellness journey'}. ${message.toLowerCase().includes('help') ? "I'm here to support you." : "Thank you for sharing that with me."} Based on what you've shared, I encourage you to take small, consistent steps forward. Remember, progress is more important than perfection. How are you feeling about taking the next step?`,
       metadata: {
         tokens_used: 150,
